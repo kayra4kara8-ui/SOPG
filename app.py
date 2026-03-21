@@ -160,22 +160,134 @@ with st.sidebar:
         st.warning("⚠️ Key 'gsk_' ile başlamalı")
 
     st.divider()
-    LEAGUES = {
-        "Premier League 🏴󠁧󠁢󠁥󠁮󠁧󠁿": "PL",  "La Liga 🇪🇸": "PD",
-        "Bundesliga 🇩🇪": "BL1",           "Serie A 🇮🇹": "SA",
-        "Ligue 1 🇫🇷": "FL1",              "Eredivisie 🇳🇱": "DED",
-        "Primeira Liga 🇵🇹": "PPL",         "Champions League ⭐": "CL",
-        "Europa League 🌍": "EL",
+
+    # ── Tüm Ligler (football-data.org v4) ──────────────────
+    # ✅ = Ücretsiz tier | 💎 = Ücretli tier (49€+)
+    LEAGUE_GROUPS = {
+        "🌍 Avrupa Kulüp (Ücretsiz ✅)": {
+            "UEFA Champions League ⭐": "CL",
+            "UEFA Europa League 🌍":    "EL",
+            "UEFA Conference League":  "EC",
+        },
+        "🏴󠁧󠁢󠁥󠁮󠁧󠁿 İngiltere (Ücretsiz ✅)": {
+            "Premier League":          "PL",
+            "Championship":            "ELC",
+            "League One":              "EL1",
+            "League Two":              "EL2",
+            "FA Cup":                  "FAC",
+            "EFL Cup (Carabao)":       "ELC2",
+        },
+        "🇪🇸 İspanya (Ücretsiz ✅)": {
+            "La Liga (Primera Division)": "PD",
+            "Segunda División":           "SD",
+            "Copa del Rey":               "CDR",
+        },
+        "🇩🇪 Almanya (Ücretsiz ✅)": {
+            "Bundesliga":              "BL1",
+            "2. Bundesliga":           "BL2",
+            "3. Bundesliga":           "BL3",
+            "DFB-Pokal":               "DFB",
+        },
+        "🇮🇹 İtalya (Ücretsiz ✅)": {
+            "Serie A":                 "SA",
+            "Serie B":                 "SB",
+            "Coppa Italia":            "CIT",
+        },
+        "🇫🇷 Fransa (Ücretsiz ✅)": {
+            "Ligue 1":                 "FL1",
+            "Ligue 2":                 "FL2",
+        },
+        "🇳🇱 Hollanda (Ücretsiz ✅)": {
+            "Eredivisie":              "DED",
+            "Eerste Divisie":          "ED",
+            "KNVB Beker":              "NLC",
+        },
+        "🇵🇹 Portekiz (Ücretsiz ✅)": {
+            "Primeira Liga":           "PPL",
+            "Liga 2 (Cabovisão)":      "PL2",
+            "Taça de Portugal":        "TAC",
+        },
+        "🇧🇷 Brezilya (Ücretsiz ✅)": {
+            "Série A":                 "BSA",
+            "Série B":                 "BSB",
+            "Copa do Brasil":          "BRC",
+        },
+        "🌐 Dünya Kupası & Milli (Ücretsiz ✅)": {
+            "FIFA World Cup":           "WC",
+            "UEFA Euro":                "EC",
+            "FIFA Club World Cup":      "CLI",
+        },
+        "🇹🇷 Türkiye 💎": {
+            "Süper Lig":               "SL",
+            "1. Lig":                  "TL1",
+        },
+        "🇧🇪 Belçika 💎": {
+            "Jupiler Pro League":       "BL",
+        },
+        "🇸🇦 Suudi Arabistan / Asya 💎": {
+            "Saudi Pro League":         "SPL",
+            "J-League (Japonya)":       "JSL",
+            "K-League (Güney Kore)":    "KCL",
+            "Chinese Super League":     "CSL",
+            "A-League (Avustralya)":    "ASL",
+        },
+        "🌎 Güney Amerika 💎": {
+            "Argentina Liga Profesional":"AASL",
+            "Copa Libertadores":        "CLI2",
+            "Copa Sudamericana":        "CSA",
+            "MLS (ABD)":               "MLS",
+            "Liga MX (Meksika)":        "MLS2",
+        },
+        "🇸🇨 İskoçya 💎": {
+            "Scottish Premier League":  "SPL2",
+        },
+        "🇬🇷 Yunanistan 💎": {
+            "Super League":            "GSL",
+        },
+        "🇷🇺 Rusya 💎": {
+            "Russian Premier League":  "RPL",
+        },
+        "🇺🇦 Ukrayna 💎": {
+            "Premier Liha":            "UPL",
+        },
+        "🇸🇪 Kuzey Avrupa 💎": {
+            "Allsvenskan (İsveç)":     "SAS",
+            "Tippeligaen (Norveç)":    "NTL",
+            "Veikkausliiga (Finlandiya)": "FVL",
+            "Superliga (Danimarka)":   "DSL",
+        },
+        "🇦🇹 Diğer Avrupa 💎": {
+            "Austrian Bundesliga":     "AUB",
+            "Swiss Super League":      "SSL",
+            "Romanian Liga I":         "ROL",
+            "Greek Super League":      "GRS",
+            "Hungarian NB I":          "HUNB",
+        },
     }
-    sel_label = st.selectbox("Lig", list(LEAGUES.keys()))
-    sel_code  = LEAGUES[sel_label]
+
+    # Tüm ligler düz dict olarak
+    LEAGUES_FLAT = {}
+    for grp, items in LEAGUE_GROUPS.items():
+        for name, code in items.items():
+            LEAGUES_FLAT[f"{name}"] = code
+
+    # Grup bazlı seçim
+    sel_group = st.selectbox(
+        "Kategori",
+        list(LEAGUE_GROUPS.keys()),
+        help="✅ = Ücretsiz | 💎 = Ücretli plan gerektirir"
+    )
+    sel_label = st.selectbox("Lig / Turnuva", list(LEAGUE_GROUPS[sel_group].keys()))
+    sel_code  = LEAGUE_GROUPS[sel_group][sel_label]
+    st.caption(f"API kodu: `{sel_code}`")
+
     sel_date  = st.date_input("Tarih", value=date.today())
     max_match = st.slider("Maks Maç", 1, 15, 8)
     n_form    = st.slider("Form Maç Sayısı", 5, 12, 8)
     n_h2h     = st.slider("H2H Maç Sayısı", 4, 10, 6)
     groq_model= st.selectbox("Groq Model", ["llama-3.3-70b-versatile","llama3-70b-8192"])
     debug     = st.checkbox("🐛 Debug", value=False)
-    st.caption("500K token/gün ücretsiz · ~10-15 maç/gün")
+    st.caption("500K token/gün ücretsiz · ✅ ligler direkt çalışır · 💎 ligler için ücretli plan gerekir")
 
 # ═══════════════════════════════════════════════════════════
 # API KATMANI
@@ -196,9 +308,35 @@ def fd_get(path, key, params=None):
         st.error(f"API hatası: {e}"); return {}
 
 def api_matches(key, code, dt, lim):
+    """
+    Maçları çek. CL/EL gibi cup turnuvaları için
+    /v4/matches genel endpoint'i kullan — daha güvenilir.
+    """
+    # Önce lig-spesifik endpoint dene
     d = fd_get(f"/competitions/{code}/matches", key,
-               {"dateFrom": dt, "dateTo": dt, "status": "SCHEDULED,TIMED,POSTPONED"})
-    return d.get("matches", [])[:lim]
+               {"dateFrom": dt, "dateTo": dt})
+    matches = d.get("matches", [])
+
+    # Filtrele: oynanmamış olanlar (tüm "bekliyor" statüsleri)
+    pending = [m for m in matches if m.get("status","") not in ("FINISHED","IN_PLAY","PAUSED","SUSPENDED","CANCELLED","AWARDED")]
+
+    # Eğer hiç maç gelmediyse global endpoint dene
+    if not pending:
+        d2 = fd_get("/matches", key, {"date": dt})
+        all_matches = d2.get("matches", [])
+        # Sadece istenen lig
+        pending = [m for m in all_matches
+                   if m.get("competition", {}).get("code","") == code
+                   and m.get("status","") not in ("FINISHED","IN_PLAY","PAUSED","SUSPENDED","CANCELLED","AWARDED")]
+
+    # Eğer hâlâ boş ama o gün oynanan maçlar varsa onları da al
+    if not pending and matches:
+        pending = matches  # tüm statüsleri kabul et
+
+    if debug and pending:
+        st.caption(f"🐛 {code} / {dt}: {len(pending)} maç (status: {set(m.get('status','?') for m in pending)})")
+
+    return pending[:lim]
 
 def api_team_matches(key, tid, n):
     return fd_get(f"/teams/{tid}/matches", key,
@@ -208,11 +346,20 @@ def api_h2h(key, mid, n):
     return fd_get(f"/matches/{mid}/head2head", key, {"limit": n}).get("matches", [])
 
 def api_standings(key, code):
-    try: return fd_get(f"/competitions/{code}/standings", key)["standings"][0]["table"]
-    except: return []
+    """Puan durumu — sadece lig tipinde çalışır, CL/EL için boş döner."""
+    try:
+        d = fd_get(f"/competitions/{code}/standings", key)
+        return d.get("standings", [{}])[0].get("table", [])
+    except:
+        return []
 
 def api_scorers(key, code):
-    return fd_get(f"/competitions/{code}/scorers", key, {"limit": 20}).get("scorers", [])
+    """Gol kraliyet listesi — cup turnuvaları için bazen boş döner."""
+    try:
+        d = fd_get(f"/competitions/{code}/scorers", key, {"limit": 20})
+        return d.get("scorers", [])
+    except:
+        return []
 
 # ═══════════════════════════════════════════════════════════
 # VERİ İŞLEME
@@ -647,25 +794,48 @@ Model ile piyasa arasında en büyük fark nerede? Neden değerli?]
 """
     return prompt
 
-def groq_analyze(prompt, key, model):
-    try:
-        r = requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-            json={
-                "model": model,
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.15,
-                "max_tokens": 4000,
-            },
-            timeout=120,
-        )
-        r.raise_for_status()
-        usage = r.json().get("usage", {})
-        if debug: st.caption(f"🐛 Token: {usage.get('total_tokens','?')}")
-        return r.json()["choices"][0]["message"]["content"]
-    except Exception as e:
-        return f"❌ Groq Hatası: {e}"
+def groq_analyze(prompt, key, model, retries=4):
+    """Groq isteği — 429 rate limit durumunda otomatik bekle & tekrar dene."""
+    wait_times = [20, 40, 60, 90]  # her retry için bekleme süresi (sn)
+    for attempt in range(retries):
+        try:
+            r = requests.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+                json={
+                    "model": model,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": 0.15,
+                    "max_tokens": 4000,
+                },
+                timeout=120,
+            )
+            if r.status_code == 429:
+                wait = wait_times[min(attempt, len(wait_times)-1)]
+                # Groq retry-after header'ını oku (varsa)
+                retry_after = int(r.headers.get("retry-after", wait))
+                actual_wait = max(wait, retry_after)
+                st.warning(f"⏳ Groq rate limit — {actual_wait}sn bekleniyor... (deneme {attempt+1}/{retries})")
+                time.sleep(actual_wait)
+                continue
+            r.raise_for_status()
+            usage = r.json().get("usage", {})
+            if debug: st.caption(f"🐛 Token: {usage.get('total_tokens','?')} | Model: {model}")
+            return r.json()["choices"][0]["message"]["content"]
+        except requests.exceptions.HTTPError as e:
+            if r.status_code == 429:
+                wait = wait_times[min(attempt, len(wait_times)-1)]
+                st.warning(f"⏳ Rate limit (HTTPError) — {wait}sn bekleniyor...")
+                time.sleep(wait)
+                continue
+            return f"❌ Groq HTTP Hatası ({r.status_code}): {e}"
+        except Exception as e:
+            if attempt < retries - 1:
+                st.warning(f"⚠️ Groq hatası, yeniden deneniyor ({attempt+1}/{retries})...")
+                time.sleep(15)
+                continue
+            return f"❌ Groq Hatası: {e}"
+    return "❌ Groq: Maksimum deneme sayısına ulaşıldı. Birkaç dakika bekleyip tekrar dene."
 
 # ═══════════════════════════════════════════════════════════
 # UI YARDIMCI — İnteraktif İstatistik Bileşenleri
@@ -761,7 +931,16 @@ if fetch_btn:
         matches = api_matches(fd_key, sel_code, sel_date.strftime("%Y-%m-%d"), max_match)
 
     if not matches:
-        st.error(f"**{sel_date:%d.%m.%Y} · {sel_label}** için planlanmış maç bulunamadı.")
+        st.error(f"""
+**{sel_date:%d.%m.%Y} · {sel_label}** için maç bulunamadı.
+
+Olası nedenler:
+- O gün bu ligde/turnuvada maç yok (uluslararası ara, boş hafta)
+- CL/EL için çeyrek final gibi aşamaların tarihleri kontrol et
+- Debug modunu aç ve API yanıtını gör
+
+Çözüm: Farklı tarih dene veya liglerde birkaç gün ileri/geri bak.
+        """)
         st.stop()
 
     st.session_state.matches = matches
@@ -839,7 +1018,13 @@ if all_btn:
             an = d["match"]["awayTeam"]["name"]
             bar2.progress(i/len(items), text=f"({i+1}/{len(items)}) {hn} – {an}")
             st.session_state.analyses[mid] = groq_analyze(d["prompt"], groq_key, groq_model)
-            time.sleep(0.5)
+            # Groq rate limit: dakikada ~14K token, her analiz ~3-4K token → maçlar arası 20sn bekle
+            if i < len(items) - 1:
+                with st.empty():
+                    for countdown in range(20, 0, -1):
+                        st.info(f"⏳ Rate limit koruması: {countdown}sn bekleniyor... (sonraki maç için)")
+                        time.sleep(1)
+                    st.empty()
         bar2.progress(1.0); time.sleep(0.3); bar2.empty()
         st.success("✅ Tümü tamamlandı!")
 
