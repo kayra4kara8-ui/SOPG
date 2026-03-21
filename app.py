@@ -374,6 +374,14 @@ def api_scorers(code):
 # VERİ İŞLEME
 # ══════════════════════════════════════════════════════════════════
 
+def _calc_score_freq(score_pairs):
+    """Skor listesinden frekans sözlüğü çıkar — {(h,a): count}"""
+    from collections import Counter
+    c = Counter(score_pairs)
+    total = sum(c.values())
+    return {f"{h}-{a}": {"count": cnt, "pct": round(cnt/total*100, 1)}
+            for (h, a), cnt in sorted(c.items(), key=lambda x: -x[1])}
+
 def parse_form(matches, tid):
     if not matches: return {}
     ms_r, ht_r = [], []
@@ -428,6 +436,10 @@ def parse_form(matches, tid):
         "streak": f"{sn} {'galibiyet' if sr=='G' else 'beraberlik' if sr=='B' else 'mağlubiyet'} serisi",
         "ms_scores": [f"{f}-{c}" for f,c in zip(gf[:6],gc[:6])],
         "ht_scores": [f"{h}-{a}" for h,a in zip(htgf[:6],htgc[:6])],
+        # Gerçek İY skor frekansları (hangi skor kaç kez çıktı)
+        "ht_score_freq": _calc_score_freq(list(zip(htgf, htgc))),
+        # Gerçek MS skor frekansları
+        "ms_score_freq": _calc_score_freq(list(zip(gf, gc))),
     }
 
 def parse_h2h(matches, home_id):
@@ -1169,21 +1181,112 @@ def render_vs_ui(match, hf, af, h2h, hxg, axg, h_htxg, a_htxg,
     )
 
 
-    # ── 11b. ÖZEL SKORLAR (İY + MS yüksek gollü) ──────────────
-    # Poisson'dan yüksek skorlu alternatifleri çek (fallback)
-    import re as _re
-    HIGH_IY  = [(s,p) for (s,p) in top_ht  if s[0]+s[1] >= 2 and p >= 0.5][:8]
-    HIGH_MS  = [(s,p) for (s,p) in top_ms  if s[0]+s[1] >= 2 and p >= 0.5][:10]
-    # 2-1, 1-2, 2-2, 3-2, 2-3 gibi özel scorlar
-    NAMED_MS = {(2,1),(1,2),(2,2),(3,1),(1,3),(3,2),(2,3),(3,0),(0,3),(4,1),(1,4),(3,3)}
-    NAMED_IY = {(2,0),(0,2),(2,1),(1,2),(2,2),(3,0),(0,3),(3,1),(1,3)}
-    # top_ms/top_ht zaten sıralı geldiği için direkt filtrele
-    special_ms_poisson = [(s,p) for (s,p) in top_ms if s in NAMED_MS][:8]
-    special_iy_poisson = [(s,p) for (s,p) in top_ht if s in NAMED_IY][:6]
+    # ── 11b. GERÇEK VERİYE DAYALI SKOR TABLOSU ──────────────
+    # İY skorları: Poisson + gerçek frekans birleşimi
+    def _build_iy_scores(hform, aform, ht_top):
+        """
+        İY skor listesi oluştur:
+        1. Her iki takımın gerçek İY skor frekansları → Poisson ağırlıklı birleştir
+        2. Sadece xG ile uyumlu makul skorlar (takımların İY gol ort'una yakın)
+        """
+        from collections import defaultdict
+        h_htxg = hform.get("ht_avg_gf", 0.5) if hform else 0.5
+        a_htxg = aform.get("ht_avg_gf", 0.5) if aform else 0.5
 
-    # İY Özel skorlar
-    iy_src = iy_special if iy_special else [{"score":f"{s[0]}-{s[1]}","pct":str(round(p,1)),"why":""} for s,p in special_iy_poisson]
-    ms_src = ms_special if ms_special else [{"score":f"{s[0]}-{s[1]}","pct":str(round(p,1)),"why":""} for s,p in special_ms_poisson]
+        # Gerçek frekans verileri
+        h_ht_freq = hform.get("ht_score_freq", {}) if hform else {}
+        a_ht_freq = aform.get("ht_score_freq", {}) if aform else {}
+
+        # Poisson top İY skorları (zaten hesaplanmış)
+        scores = {}
+        for (hg, ag), prob in ht_top[:12]:
+            scores[f"{hg}-{ag}"] = {"pct": round(prob, 1), "sources": ["model"]}
+
+        # Gerçek frekans: ev sahibi için (kendi attığı = hg, yediği = ag)
+        for sc, info in h_ht_freq.items():
+            if sc in scores:
+                # Model ile gerçek frekansı ağırlıkla
+                combined = round(scores[sc]["pct"] * 0.55 + info["pct"] * 0.45, 1)
+                scores[sc] = {"pct": combined, "sources": ["model", "ev_form"],
+                              "why": f"Ev {info['count']}x gerçekte çıktı"}
+            else:
+                scores[sc] = {"pct": round(info["pct"] * 0.45, 1),
+                              "sources": ["ev_form"],
+                              "why": f"Ev {info['count']}x gerçekte çıktı"}
+
+        # Gerçek frekans: deplasman için (attığı = ag, yediği = hg — ters çevir)
+        for sc, info in a_ht_freq.items():
+            parts = sc.split("-")
+            if len(parts) == 2:
+                rev_sc = f"{parts[1]}-{parts[0]}"  # deplasman perspektifinden ev-dep'e çevir
+                if rev_sc in scores:
+                    combined = round(scores[rev_sc]["pct"] * 0.55 + info["pct"] * 0.45, 1)
+                    old_why = scores[rev_sc].get("why","")
+                    scores[rev_sc] = {"pct": combined, "sources": scores[rev_sc]["sources"] + ["dep_form"],
+                                      "why": f"{old_why} | Dep {info['count']}x".strip(" |")}
+                else:
+                    scores[rev_sc] = {"pct": round(info["pct"] * 0.40, 1),
+                                      "sources": ["dep_form"],
+                                      "why": f"Dep {info['count']}x gerçekte çıktı"}
+
+        # Makulsüz skorları filtrele (xG'den çok uzak olanları düşür)
+        filtered = {}
+        for sc, info in scores.items():
+            parts = sc.split("-")
+            if len(parts) != 2: continue
+            try:
+                hg, ag = int(parts[0]), int(parts[1])
+            except: continue
+            # İY'de 3+ gol çok nadir — sadece yüksek xG varsa göster
+            if hg + ag >= 3 and h_htxg + a_htxg < 1.5:
+                continue
+            # Her iki takım da 0'dan fazla atacaksa xG desteği gerek
+            if hg > 0 and ag > 0 and h_htxg < 0.3 and a_htxg < 0.3:
+                continue
+            filtered[sc] = info
+
+        # Sırala ve en iyi 6 döndür
+        sorted_scores = sorted(filtered.items(), key=lambda x: -x[1]["pct"])
+        return [{"score": sc, "pct": str(info["pct"]), "why": info.get("why","")}
+                for sc, info in sorted_scores[:6] if info["pct"] >= 0.5]
+
+    def _build_ms_scores(hform, aform, ms_top):
+        """MS skor listesi: Poisson + gerçek frekans birleşimi"""
+        h_avg_gf = hform.get("avg_gf", 1.2) if hform else 1.2
+        a_avg_gf = aform.get("avg_gf", 1.0) if aform else 1.0
+        h_ms_freq = hform.get("ms_score_freq", {}) if hform else {}
+        a_ms_freq = aform.get("ms_score_freq", {}) if aform else {}
+
+        scores = {}
+        for (hg, ag), prob in ms_top[:12]:
+            scores[f"{hg}-{ag}"] = {"pct": round(prob, 1), "why": ""}
+
+        for sc, info in h_ms_freq.items():
+            if sc in scores:
+                combined = round(scores[sc]["pct"] * 0.5 + info["pct"] * 0.5, 1)
+                scores[sc] = {"pct": combined, "why": f"Ev {info['count']}x"}
+            elif info["pct"] >= 5:
+                scores[sc] = {"pct": round(info["pct"] * 0.45, 1), "why": f"Ev {info['count']}x"}
+
+        for sc, info in a_ms_freq.items():
+            parts = sc.split("-")
+            if len(parts) == 2:
+                rev_sc = f"{parts[1]}-{parts[0]}"
+                if rev_sc in scores:
+                    old = scores[rev_sc]
+                    combined = round(old["pct"] * 0.5 + info["pct"] * 0.5, 1)
+                    scores[rev_sc] = {"pct": combined,
+                                      "why": f"{old.get('why','')} Dep {info['count']}x".strip()}
+                elif info["pct"] >= 5:
+                    scores[rev_sc] = {"pct": round(info["pct"] * 0.40, 1),
+                                      "why": f"Dep {info['count']}x"}
+
+        sorted_s = sorted(scores.items(), key=lambda x: -x[1]["pct"])
+        return [{"score": sc, "pct": str(round(info["pct"],1)), "why": info.get("why","")}
+                for sc, info in sorted_s[:8] if info["pct"] >= 1.0]
+
+    iy_src = _build_iy_scores(hf, af, top_ht)
+    ms_src = _build_ms_scores(hf, af, top_ms)
 
     if iy_src or ms_src:
         def _score_item(score, pct, why, bg, border, score_color, pct_color):
@@ -1205,18 +1308,18 @@ def render_vs_ui(match, hf, af, h2h, hxg, axg, h_htxg, a_htxg,
 
         spec_html = (
             '<div style="padding:1.2rem 1.8rem;border-bottom:1px solid #0a1e30">'
-            '<div class="dp-section-title">⚡ ÖZEL SKOR TAHMİNLERİ</div>'
+            '<div class="dp-section-title">📐 SKOR ANALİZİ — Gerçek Form + Poisson Modeli</div>'
             '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:8px">'
             '<div>'
             '<div style="font-size:.65rem;color:#6d28d9;font-weight:700;letter-spacing:.1em;'
             'text-transform:uppercase;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid #1a0a3c">'
-            '🕐 İLK YARI ÖZEL SKORLAR</div>'
+            '🕐 İLK YARI SKOR TAHMİNLERİ (Form + Model)</div>'
             + iy_items_html +
             '</div>'
             '<div>'
             '<div style="font-size:.65rem;color:#059669;font-weight:700;letter-spacing:.1em;'
             'text-transform:uppercase;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid #052e16">'
-            '🏁 MAÇ SONU ÖZEL SKORLAR</div>'
+            '🏁 MAÇ SONU SKOR TAHMİNLERİ (Form + Model)</div>'
             + ms_items_html +
             '</div>'
             '</div>'
