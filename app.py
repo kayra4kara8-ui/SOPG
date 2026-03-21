@@ -322,7 +322,15 @@ with st.sidebar:
     max_match = st.slider("Maks Maç", 1, 15, 8)
     n_form    = st.slider("Form Maç Sayısı", 5, 12, 8)
     n_h2h     = st.slider("H2H Maç Sayısı", 4, 10, 6)
-    groq_model= st.selectbox("Model", ["llama-3.3-70b-versatile","llama3-70b-8192"])
+    groq_model = st.selectbox(
+        "Groq Modeli",
+        [
+            "llama-3.1-8b-instant",       # ⚡ En hızlı (önerilen)
+            "llama-3.3-70b-versatile",    # 🧠 En kaliteli (yavaş)
+            "llama3-70b-8192",            # 🧠 Kaliteli (yavaş)
+        ],
+        help="llama-3.1-8b-instant çok daha hızlı ve rate limit yok gibi. 70B daha derin analiz yapar ama yavaş."
+    )
     debug     = st.checkbox("🐛 Debug", value=False)
 
 # ══════════════════════════════════════════════════════════════════
@@ -1096,84 +1104,70 @@ def render_vs_ui(match, hf, af, h2h, hxg, axg, h_htxg, a_htxg,
     d21 = " ".join(secs.get("2/1 DÖNÜŞ","").split()[:50]) if secs.get("2/1 DÖNÜŞ") else ""
     d12 = " ".join(secs.get("1/2 DÖNÜŞ","").split()[:50]) if secs.get("1/2 DÖNÜŞ") else ""
 
-    st.markdown(f"""
-<div class="donus-panel">
-  <div class="dp-section-title">DÖNÜŞ ANALİZİ</div>
-  <div class="donus-grid">
-    <div class="donus-card {'hot21' if hot21 else ''}">
-      <div class="dc-title">2/1 DÖNÜŞ {'🔥' if hot21 else ''}</div>
-      <div class="dc-explain">İY: <b style="color:#f87171">{a}</b> önde → MS: <b style="color:#60a5fa">{h}</b> kazanır</div>
-      <div class="donus-row">
-        <div class="dr-lbl">Model İhtimali</div>
-        <div class="dr-v" style="color:{'#fbbf24' if hot21 else '#3a5570'}">%{rev21_m}</div>
-      </div>
-      <div class="donus-row">
-        <div class="dr-lbl">H2H Tarihsel</div>
-        <div class="dr-v" style="color:{'#fbbf24' if rev21_h>15 else '#3a5570'}">%{rev21_h} ({h2h.get('rev21',0)}/{h2h.get('n',0)} maç)</div>
-      </div>
-      <div class="donus-row">
-        <div class="dr-lbl">{h} 2Y Gol Yükü</div>
-        <div class="dr-v" style="color:{'#34d399' if fv(hf,'st_pct',55)>=60 else '#3a5570'}">%{fv(hf,'st_pct',55)}</div>
-      </div>
-      <div class="donus-row">
-        <div class="dr-lbl">{a} İY Gol Yükü</div>
-        <div class="dr-v">%{fv(af,'ht_pct',45)}</div>
-      </div>
-      {f'<div style="font-size:.68rem;color:#3a5570;margin-top:6px;line-height:1.5">{d21}</div>' if d21 else ''}
-    </div>
-    <div class="donus-card {'hot12' if hot12 else ''}">
-      <div class="dc-title">1/2 DÖNÜŞ {'🔥' if hot12 else ''}</div>
-      <div class="dc-explain">İY: <b style="color:#60a5fa">{h}</b> önde → MS: <b style="color:#f87171">{a}</b> kazanır</div>
-      <div class="donus-row">
-        <div class="dr-lbl">Model İhtimali</div>
-        <div class="dr-v" style="color:{'#c4b5fd' if hot12 else '#3a5570'}">%{rev12_m}</div>
-      </div>
-      <div class="donus-row">
-        <div class="dr-lbl">H2H Tarihsel</div>
-        <div class="dr-v" style="color:{'#c4b5fd' if rev12_h>15 else '#3a5570'}">%{rev12_h} ({h2h.get('rev12',0)}/{h2h.get('n',0)} maç)</div>
-      </div>
-      <div class="donus-row">
-        <div class="dr-lbl">{a} 2Y Gol Yükü</div>
-        <div class="dr-v" style="color:{'#34d399' if fv(af,'st_pct',55)>=60 else '#3a5570'}">%{fv(af,'st_pct',55)}</div>
-      </div>
-      <div class="donus-row">
-        <div class="dr-lbl">{h} İY Gol Yükü</div>
-        <div class="dr-v">%{fv(hf,'ht_pct',45)}</div>
-      </div>
-      {f'<div style="font-size:.68rem;color:#3a5570;margin-top:6px;line-height:1.5">{d12}</div>' if d12 else ''}
-    </div>
-  </div>
-</div>
-""", unsafe_allow_html=True)
+    # ── 10. DÖNÜŞ ANALİZİ — Python ile oluştur (tag güvenliği) ──
+    rev21_m = stats['rev21']; rev21_h = h2h.get('rev21_pct',0)
+    rev12_m = stats['rev12']; rev12_h = h2h.get('rev12_pct',0)
+    hot21 = rev21_m > 10 or rev21_h > 20
+    hot12 = rev12_m > 10 or rev12_h > 20
+    d21_txt = " ".join(secs.get("2/1 DÖNÜŞ","").split()[:60]) if secs.get("2/1 DÖNÜŞ") else ""
+    d12_txt = " ".join(secs.get("1/2 DÖNÜŞ","").split()[:60]) if secs.get("1/2 DÖNÜŞ") else ""
 
-    # ── 11. SENARYOLAR (İY → 2H → MS) ────────────────────────
-    if scenarios:
-        sce_html = '<div style="padding:1.2rem 1.8rem;border-bottom:1px solid #0a1e30">'
-        sce_html += '<div class="dp-section-title">SENARYOLAR — İY · 2H · MS</div>'
-        for sc in scenarios[:5]:
-            sce_html += f"""
-<div style="display:grid;grid-template-columns:1fr 1fr 1fr 60px;gap:8px;
-margin:6px 0;padding:10px;background:#0a1628;border-radius:10px;border:1px solid #0f2a45;
-align-items:center">
-  <div style="text-align:center">
-    <div style="font-size:.58rem;color:#2a4060;text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px">İLK YARI</div>
-    <div style="font-size:1.1rem;font-weight:700;color:#c0cfe0;font-family:'JetBrains Mono',monospace">{sc['iy']}</div>
+    def _donus_card(title, explain, model_pct, h2h_pct, h2h_n, h2h_total,
+                    team1_lbl, team1_pct, team1_color,
+                    team2_lbl, team2_pct,
+                    extra_text, is_hot, hot_color):
+        card_cls = "donus-card hot21" if is_hot and "2/1" in title else "donus-card hot12" if is_hot else "donus-card"
+        title_color = hot_color if is_hot else "#1a3050"
+        model_color = hot_color if is_hot else "#3a5570"
+        h2h_color   = hot_color if h2h_pct > 15 else "#3a5570"
+        t1_color    = "#34d399" if team1_pct >= 60 else "#3a5570"
+        extra_div   = f'<div style="font-size:.68rem;color:#3a5570;margin-top:6px;line-height:1.5;padding-top:6px;border-top:1px solid #0a1e30">{extra_text}</div>' if extra_text else ""
+        return f"""<div class="{card_cls}">
+  <div class="dc-title" style="color:{title_color}">{title}</div>
+  <div class="dc-explain">{explain}</div>
+  <div class="donus-row">
+    <div class="dr-lbl">Model İhtimali</div>
+    <div class="dr-v" style="color:{model_color}">%{model_pct}</div>
   </div>
-  <div style="text-align:center">
-    <div style="font-size:.58rem;color:#2a4060;text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px">2. YARI</div>
-    <div style="font-size:1.1rem;font-weight:700;color:#c0cfe0;font-family:'JetBrains Mono',monospace">{sc['2y']}</div>
+  <div class="donus-row">
+    <div class="dr-lbl">H2H Tarihsel</div>
+    <div class="dr-v" style="color:{h2h_color}">%{h2h_pct} ({h2h_n}/{h2h_total} maç)</div>
   </div>
-  <div style="text-align:center;background:#0d1e10;border:1px solid #166534;border-radius:8px;padding:8px 6px">
-    <div style="font-size:.58rem;color:#166534;text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px">MAÇ SONU</div>
-    <div style="font-size:1.2rem;font-weight:800;color:#34d399;font-family:'JetBrains Mono',monospace">{sc['ms']}</div>
+  <div class="donus-row">
+    <div class="dr-lbl">{team1_lbl}</div>
+    <div class="dr-v" style="color:{t1_color}">%{team1_pct}</div>
   </div>
-  <div style="text-align:center">
-    <div style="font-size:.6rem;color:#2a4060;margin-bottom:2px">OLAS.</div>
-    <div style="font-size:.9rem;font-weight:700;color:#fbbf24;font-family:'JetBrains Mono',monospace">%{sc['pct']}</div>
+  <div class="donus-row">
+    <div class="dr-lbl">{team2_lbl}</div>
+    <div class="dr-v" style="color:#6b7280">%{team2_pct}</div>
   </div>
+  {extra_div}
 </div>"""
-        sce_html += "</div>"
-        st.markdown(sce_html, unsafe_allow_html=True)
+
+    card21 = _donus_card(
+        title   = "2/1 DÖNÜŞ" + (" 🔥" if hot21 else ""),
+        explain = f'İY: <b style="color:#f87171">{a}</b> önde → MS: <b style="color:#60a5fa">{h}</b> kazanır',
+        model_pct=rev21_m, h2h_pct=rev21_h,
+        h2h_n=h2h.get("rev21",0), h2h_total=h2h.get("n",0),
+        team1_lbl=f"{h} 2Y Gol Yükü", team1_pct=fv(hf,"st_pct",55), team1_color="#fbbf24",
+        team2_lbl=f"{a} İY Gol Yükü", team2_pct=fv(af,"ht_pct",45),
+        extra_text=d21_txt, is_hot=hot21, hot_color="#fbbf24"
+    )
+    card12 = _donus_card(
+        title   = "1/2 DÖNÜŞ" + (" 🔥" if hot12 else ""),
+        explain = f'İY: <b style="color:#60a5fa">{h}</b> önde → MS: <b style="color:#f87171">{a}</b> kazanır',
+        model_pct=rev12_m, h2h_pct=rev12_h,
+        h2h_n=h2h.get("rev12",0), h2h_total=h2h.get("n",0),
+        team1_lbl=f"{a} 2Y Gol Yükü", team1_pct=fv(af,"st_pct",55), team1_color="#c4b5fd",
+        team2_lbl=f"{h} İY Gol Yükü", team2_pct=fv(hf,"ht_pct",45),
+        extra_text=d12_txt, is_hot=hot12, hot_color="#c4b5fd"
+    )
+    st.markdown(
+        f'<div class="donus-panel"><div class="dp-section-title">DÖNÜŞ ANALİZİ</div>'
+        f'<div class="donus-grid">{card21}{card12}</div></div>',
+        unsafe_allow_html=True
+    )
+
 
     # ── 11b. ÖZEL SKORLAR (İY + MS yüksek gollü) ──────────────
     # Poisson'dan yüksek skorlu alternatifleri çek (fallback)
@@ -1192,51 +1186,42 @@ align-items:center">
     ms_src = ms_special if ms_special else [{"score":f"{s[0]}-{s[1]}","pct":str(round(p,1)),"why":""} for s,p in special_ms_poisson]
 
     if iy_src or ms_src:
-        spec_html = """
-<div style="padding:1.2rem 1.8rem;border-bottom:1px solid #0a1e30">
-  <div class="dp-section-title">⚡ ÖZEL SKOR TAHMİNLERİ</div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:8px">
-"""
-        # İY özel
-        spec_html += """    <div>
-      <div style="font-size:.65rem;color:#6d28d9;font-weight:700;letter-spacing:.1em;
-      text-transform:uppercase;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid #1a0a3c">
-      🕐 İLK YARI ÖZEL SKORLAR</div>"""
-        for it in iy_src[:6]:
-            spec_html += f"""
-      <div style="display:flex;justify-content:space-between;align-items:center;
-      padding:6px 10px;margin:4px 0;background:#0d0a1a;border:1px solid #2d1d5e;
-      border-radius:8px">
-        <div style="font-size:1.05rem;font-weight:800;color:#c4b5fd;
-        font-family:'JetBrains Mono',monospace">{it['score']}</div>
-        <div style="text-align:right">
-          <div style="font-size:.85rem;font-weight:700;color:#a78bfa;
-          font-family:'JetBrains Mono',monospace">%{it['pct']}</div>
-          {f'<div style="font-size:.62rem;color:#3a2a6e;margin-top:1px">{it["why"][:45]}</div>' if it.get("why") else ""}
-        </div>
-      </div>"""
-        spec_html += "    </div>"
+        def _score_item(score, pct, why, bg, border, score_color, pct_color):
+            why_div = (f'<div style="font-size:.6rem;color:#3a2a6e;margin-top:1px">{why[:40]}</div>'
+                       if why else "")
+            mono = "JetBrains Mono,monospace"
+            return (
+                f'<div style="display:flex;justify-content:space-between;align-items:center;'
+                f'padding:6px 10px;margin:4px 0;background:{bg};border:1px solid {border};border-radius:8px">'
+                f'<div style="font-size:1.05rem;font-weight:800;color:{score_color};font-family:{mono}">'
+                f'{score}</div>'
+                f'<div style="text-align:right">'
+                f'<div style="font-size:.85rem;font-weight:700;color:{pct_color};font-family:{mono}">%{pct}</div>'
+                f'{why_div}</div></div>'
+            )
 
-        # MS özel
-        spec_html += """    <div>
-      <div style="font-size:.65rem;color:#059669;font-weight:700;letter-spacing:.1em;
-      text-transform:uppercase;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid #052e16">
-      🏁 MAÇ SONU ÖZEL SKORLAR</div>"""
-        for it in ms_src[:8]:
-            spec_html += f"""
-      <div style="display:flex;justify-content:space-between;align-items:center;
-      padding:6px 10px;margin:4px 0;background:#040f09;border:1px solid #0d3320;
-      border-radius:8px">
-        <div style="font-size:1.05rem;font-weight:800;color:#34d399;
-        font-family:'JetBrains Mono',monospace">{it['score']}</div>
-        <div style="text-align:right">
-          <div style="font-size:.85rem;font-weight:700;color:#6ee7b7;
-          font-family:'JetBrains Mono',monospace">%{it['pct']}</div>
-          {f'<div style="font-size:.62rem;color:#1a4a30;margin-top:1px">{it["why"][:45]}</div>' if it.get("why") else ""}
-        </div>
-      </div>"""
-        spec_html += "    </div>"
-        spec_html += "  </div></div>"
+        iy_items_html = "".join(_score_item(it["score"],it["pct"],it.get("why",""),"#0d0a1a","#2d1d5e","#c4b5fd","#a78bfa") for it in iy_src[:6])
+        ms_items_html = "".join(_score_item(it["score"],it["pct"],it.get("why",""),"#040f09","#0d3320","#34d399","#6ee7b7") for it in ms_src[:8])
+
+        spec_html = (
+            '<div style="padding:1.2rem 1.8rem;border-bottom:1px solid #0a1e30">'
+            '<div class="dp-section-title">⚡ ÖZEL SKOR TAHMİNLERİ</div>'
+            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:8px">'
+            '<div>'
+            '<div style="font-size:.65rem;color:#6d28d9;font-weight:700;letter-spacing:.1em;'
+            'text-transform:uppercase;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid #1a0a3c">'
+            '🕐 İLK YARI ÖZEL SKORLAR</div>'
+            + iy_items_html +
+            '</div>'
+            '<div>'
+            '<div style="font-size:.65rem;color:#059669;font-weight:700;letter-spacing:.1em;'
+            'text-transform:uppercase;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid #052e16">'
+            '🏁 MAÇ SONU ÖZEL SKORLAR</div>'
+            + ms_items_html +
+            '</div>'
+            '</div>'
+            '</div>'
+        )
         st.markdown(spec_html, unsafe_allow_html=True)
 
     # ── 12. TAVSİYELER ────────────────────────────────────────
