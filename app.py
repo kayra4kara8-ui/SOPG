@@ -82,8 +82,15 @@ with st.sidebar:
 
     fd_key     = st.text_input("football-data.org Key", type="password",
                                 placeholder="Mail'den gelen key...")
+    st.markdown("**Claude API Key (opsiyonel)**")
+    st.caption("Boş bırak → Yerleşik analiz motoru kullanılır (ücretsiz)")
     claude_key = st.text_input("Claude API Key", type="password",
-                                placeholder="sk-ant-...")
+                                placeholder="sk-ant-... (boş bırakabilirsin)",
+                                label_visibility="collapsed")
+    if claude_key and claude_key.strip().startswith("sk-ant"):
+        st.success("✅ Claude modu — Gelişmiş AI analiz")
+    else:
+        st.info("⚙️ Yerleşik motor aktif — Ücretsiz tam analiz")
 
     st.divider()
     st.markdown("## ⚙️ Filtreler")
@@ -637,6 +644,338 @@ def claude_analyze(prompt, key):
     except Exception as e:
         return f"❌ Claude Hatası: {e}"
 
+
+# ─────────────────────────────────────────
+# YERLEŞİK DERİN ANALİZ MOTORU
+# ─────────────────────────────────────────
+
+def bar_chart(pct, width=20):
+    filled = int(pct / 100 * width)
+    return "█" * filled + "░" * (width - filled)
+
+def risk_calc(hf, af, h2h):
+    hp = hf.get("pts5", 7) if hf else 7
+    ap = af.get("pts5", 7) if af else 7
+    h2n = h2h.get("n", 0) if h2h else 0
+    diff = abs(hp - ap)
+    if diff >= 9 and h2n >= 4:
+        return "DÜŞÜK ✅", "Belirgin güç farkı var, yeterli H2H geçmişi mevcut."
+    elif diff >= 5 or h2n >= 3:
+        return "ORTA ⚡", "Güç farkı var ancak sürpriz ihtimali göz ardı edilemez."
+    else:
+        return "YÜKSEK ⚠️", "Takımlar birbirine yakın ya da veri yetersiz — dikkatli ol."
+
+def local_analyze(d):
+    """Claude API olmadan tam 9 maddelik profesyonel analiz üret."""
+    m     = d["match"]
+    hform = d.get("hform", {}) or {}
+    aform = d.get("aform", {}) or {}
+    h2h   = d.get("h2h", {})   or {}
+    hxg   = d.get("hxg", 1.2)
+    axg   = d.get("axg", 1.0)
+    h     = m["homeTeam"]["name"]
+    a     = m["awayTeam"]["name"]
+
+    # Matrisler (önceden build_prompt tarafından hesaplanmış xG'yi kullan)
+    ms_mat = score_matrix(hxg, axg)
+    # İY xG yaklaşık
+    h_ht_xg = round(hform.get("ht_avg_gf", hxg * 0.42), 3)
+    a_ht_xg = round(aform.get("ht_avg_gf", axg * 0.42), 3)
+    ht_mat  = score_matrix(max(0.2, h_ht_xg), max(0.2, a_ht_xg), max_g=4)
+
+    top_ms = sorted(ms_mat.items(), key=lambda x: -x[1])
+    top_ht = sorted(ht_mat.items(), key=lambda x: -x[1])
+
+    p1  = round(sum(v for (hg,ag),v in ms_mat.items() if hg>ag),  1)
+    px  = round(sum(v for (hg,ag),v in ms_mat.items() if hg==ag), 1)
+    p2  = round(100-p1-px, 1)
+    iy1 = round(sum(v for (hg,ag),v in ht_mat.items() if hg>ag),  1)
+    iyx = round(sum(v for (hg,ag),v in ht_mat.items() if hg==ag), 1)
+    iy2 = round(100-iy1-iyx, 1)
+
+    combos = {}
+    for ir,ip in [("1",iy1),("X",iyx),("2",iy2)]:
+        for mr,mp in [("1",p1),("X",px),("2",p2)]:
+            combos[f"{ir}/{mr}"] = round(ip*mp/100, 2)
+    combos_s = sorted(combos.items(), key=lambda x:-x[1])
+
+    p_h0   = poisson(hxg, 0); p_a0 = poisson(axg, 0)
+    kg_var = round((1-p_h0)*(1-p_a0)*100, 1)
+    kg_yok = round(100-kg_var, 1)
+    ust15  = round(sum(v for (hg,ag),v in ms_mat.items() if hg+ag>1), 1)
+    ust25  = round(sum(v for (hg,ag),v in ms_mat.items() if hg+ag>2), 1)
+    alt25  = round(100-ust25, 1)
+    ust35  = round(sum(v for (hg,ag),v in ms_mat.items() if hg+ag>3), 1)
+    alt35  = round(100-ust35, 1)
+    ust45  = round(sum(v for (hg,ag),v in ms_mat.items() if hg+ag>4), 1)
+
+    rev_21_model = round(iy2*p1/100, 2)
+    rev_12_model = round(iy1*p2/100, 2)
+    rev_21_h2h   = h2h.get("rev_21_pct", 0)
+    rev_12_h2h   = h2h.get("rev_12_pct", 0)
+
+    best_ms  = top_ms[0][0]
+    best_ht  = top_ht[0][0]
+    best_ms_p = round(top_ms[0][1], 1)
+    best_ht_p = round(top_ht[0][1], 1)
+
+    risk_lv, risk_why = risk_calc(hform, aform, h2h)
+
+    # --- Form yorumları ---
+    def form_yorum(f, name, is_home):
+        if not f: return f"  {name}: Form verisi yok."
+        pts  = f.get("pts5", 0)
+        avgf = f.get("home_avg_gf" if is_home else "away_avg_gf", f.get("avg_gf", 1.2))
+        avgg = f.get("home_avg_gc" if is_home else "away_avg_gc", f.get("avg_gc", 1.2))
+        seri = f.get("streak", "?")
+        ht_r = f.get("ht_gol_orani", 45)
+        st_r = f.get("st_gol_orani", 55)
+        tip  = "İç saha" if is_home else "Deplasman"
+        lines = [
+            f"  {name} ({tip}) — Form: {f.get('form_str','?')} | {pts}/15 puan",
+            f"  Gol ort: {avgf} attı / {avgg} yedi | Seri: {seri}",
+            f"  İY Gol Ort: {f.get('ht_avg_gf','?')} attı / {f.get('ht_avg_gc','?')} yedi",
+            f"  Gol zamanı: %{ht_r} İY · %{st_r} 2Y",
+            f"  KG VAR: {f.get('btts',0)}/{f.get('n',0)} | 2.5Üst: {f.get('over25',0)}/{f.get('n',0)} | Kuru: {f.get('clean_sheets',0)}/{f.get('n',0)}",
+        ]
+        # Tempo yorumu
+        if ht_r < 38:
+            lines.append(f"  ⚡ Bu takım gollerini ağırlıklı 2. yarıda atıyor (%{st_r}) → yavaş başlangıç eğilimi")
+        elif ht_r > 55:
+            lines.append(f"  ⚡ Bu takım gollerini ağırlıklı ilk yarıda atıyor (%{ht_r}) → erken baskı eğilimi")
+        if avgg < 0.7:
+            lines.append(f"  🛡️ Savunma çok sağlam — maç başına {avgg} gol yiyor")
+        elif avgg > 1.8:
+            lines.append(f"  ⚠️ Savunma zayıf — maç başına {avgg} gol yiyor")
+        return "\n".join(lines)
+
+    # --- Skor gerekçesi ---
+    fav = h if p1 > p2 else (a if p2 > p1 else "Belirsiz")
+    fav_xg = hxg if p1 > p2 else axg
+    und_xg  = axg if p1 > p2 else hxg
+
+    def score_reason(hg, ag):
+        total = hg + ag
+        reasons = []
+        if hg > ag:
+            reasons.append(f"{h} xG {hxg} > {a} xG {axg} — ev üstünlüğü destekliyor")
+        elif ag > hg:
+            reasons.append(f"{a} xG {axg} form verisiyle yeterli — deplasman gücü var")
+        else:
+            reasons.append("xG dengeli, beraberlik Poisson modelinde güçlü")
+        if total > 3:
+            reasons.append("Her iki tarafın savunma açığı yüksek gol sayısını destekliyor")
+        elif total < 2:
+            reasons.append("Savunma sağlamlığı düşük skorlu sonucu destekliyor")
+        return "; ".join(reasons)
+
+    # --- 2/1 & 1/2 derin yorum ---
+    def donus_yorum_21():
+        lines = []
+        model_str = f"%{rev_21_model}"
+        h2h_str   = f"%{rev_21_h2h} ({h2h.get('rev_21',0)}/{h2h.get('n',1)} maç)"
+        lines.append(f"  Model: {model_str} | H2H geçmiş: {h2h_str}")
+        # Tempo analizi
+        h_2y = aform.get("st_gol_orani", 55) if aform else 55
+        a_2y = aform.get("st_gol_orani", 55) if aform else 55
+        if axg > hxg * 0.8 and h_2y > 55:
+            lines.append(f"  {a} 2Y'de daha aktif (%{h_2y} gol 2Y'de) → İY üstünlüğü mümkün")
+        if hform.get("st_gol_orani", 50) > 58:
+            lines.append(f"  {h} 2Y'de gol atma eğilimi yüksek (%{hform.get('st_gol_orani',50)}) → Dönüş için zemin var")
+        if rev_21_model < 8 and rev_21_h2h < 15:
+            lines.append(f"  ⚠️ Hem model hem H2H düşük → 2/1 pek gerçekçi değil")
+        elif rev_21_model > 12 or rev_21_h2h > 25:
+            lines.append(f"  ✅ Model veya H2H geçmiş yüksek → 2/1 senaryosu izlenebilir")
+        return "\n".join(lines)
+
+    def donus_yorum_12():
+        lines = []
+        model_str = f"%{rev_12_model}"
+        h2h_str   = f"%{rev_12_h2h} ({h2h.get('rev_12',0)}/{h2h.get('n',1)} maç)"
+        lines.append(f"  Model: {model_str} | H2H geçmiş: {h2h_str}")
+        a_2y = aform.get("st_gol_orani", 50) if aform else 50
+        if hxg > axg * 0.8 and a_2y > 55:
+            lines.append(f"  {h} erken baskı, {a} 2Y'de gol baskısı → 1/2 için zemin")
+        if rev_12_model < 8 and rev_12_h2h < 15:
+            lines.append(f"  ⚠️ Hem model hem H2H düşük → 1/2 pek gerçekçi değil")
+        elif rev_12_model > 12 or rev_12_h2h > 25:
+            lines.append(f"  ✅ Model veya H2H geçmiş yüksek → 1/2 senaryosu izlenebilir")
+        return "\n".join(lines)
+
+    # --- Banko / Orta / Sürpriz ---
+    if p1 >= 58:
+        banko = f"MS 1 ({h} galibiyeti) — %{p1}"
+        banko_why = f"{h} xG {hxg} ile belirgin üstün; form {hform.get('form_str','?')}"
+    elif p2 >= 52:
+        banko = f"MS 2 ({a} galibiyeti) — %{p2}"
+        banko_why = f"{a} xG {axg}, deplasman formu güçlü"
+    elif ust25 >= 65:
+        banko = f"2.5 ÜST — %{ust25}"
+        banko_why = f"Her iki takım da yüksek xG; KG VAR %{kg_var}"
+    elif alt25 >= 62:
+        banko = f"2.5 ALT — %{alt25}"
+        banko_why = f"İki savunma da sağlam; toplam xG {round(hxg+axg,2)} düşük"
+    elif kg_var >= 65:
+        banko = f"KG VAR — %{kg_var}"
+        banko_why = f"Her iki takım da gol atma kapasitesi yüksek"
+    else:
+        top_combo = combos_s[0]
+        banko = f"İY/MS {top_combo[0]} — %{top_combo[1]}"
+        banko_why = "En yüksek olasılıklı İY/MS kombinasyonu"
+
+    # Orta risk
+    if px >= 28:
+        orta = f"Beraberlik (X) — %{px}"
+        orta_why = "İki takım güç dengeli; x oranı değerli olabilir"
+    elif kg_var >= 58 and ust25 >= 55:
+        orta = f"KG VAR + 2.5 ÜST — %{round(kg_var*ust25/100,1)}"
+        orta_why = "Her iki takımın da hücum/savunma dengesi destekliyor"
+    else:
+        sc = combos_s[1]
+        orta = f"İY/MS {sc[0]} — %{sc[1]}"
+        orta_why = "İkinci en yüksek olasılıklı İY/MS kombinasyonu"
+
+    # Sürpriz
+    surpriz_score = top_ms[3] if len(top_ms) > 3 else top_ms[-1]
+    surpriz = f"Skor {surpriz_score[0][0]}-{surpriz_score[0][1]} — %{round(surpriz_score[1],1)}"
+    surpriz_why = "4. en olası skor — piyasada yüksek oran taşır, Poisson model destekli"
+
+    # Skor sürprizi
+    yuksek_gol = [(s,p) for (s,p) in top_ms if s[0]+s[1] >= 4]
+    skor_surpriz = yuksek_gol[0] if yuksek_gol else top_ms[2]
+    skor_surp_str = f"{skor_surpriz[0][0]}-{skor_surpriz[0][1]} — %{round(skor_surpriz[1],1)}"
+
+    # ───────── RAPOR ─────────
+    report = f"""
+╔══════════════════════════════════════════════════════════════════╗
+  ⚽ {h.upper()} vs {a.upper()}
+╚══════════════════════════════════════════════════════════════════╝
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1️⃣  EN OLASI SKOR TAHMİNİ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  🎯 MS TAHMİN : {best_ms[0]}-{best_ms[1]}  →  %{best_ms_p}
+  🎯 İY TAHMİN : {best_ht[0]}-{best_ht[1]}  →  %{best_ht_p}
+
+  Gerekçe: {score_reason(best_ms[0], best_ms[1])}
+  {h} xG = {hxg}  |  {a} xG = {axg}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2️⃣  ALTERNATİF SKOR DAĞILIMI
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{chr(10).join(
+    f"  {hg}-{ag}  {bar_chart(prob,18)}  %{round(prob,1):5.1f}  {'← EN OLASILIK' if i==0 else ''}"
+    for i,((hg,ag),prob) in enumerate(top_ms[:9])
+)}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+3️⃣  İY / MS TAHMİNİ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  İLK YARI  :  1=%{iy1}  |  X=%{iyx}  |  2=%{iy2}
+  MAÇ SONU  :  1=%{p1}   |  X=%{px}   |  2=%{p2}
+
+  İY/MS Kombinasyonları:
+  ┌─────────┬────────┐
+  │ Senaryo │ Oran   │
+  ├─────────┼────────┤
+{chr(10).join(f"  │  {k:<7}  │  %{v:<5.1f} │" for k,v in combos_s)}
+  └─────────┴────────┘
+
+  Yorum:
+  • {h} form puanı {hform.get('pts5',0)}/15 · {a} form puanı {aform.get('pts5',0)}/15
+  • {'İlk yarıda ' + h + ' üstün görünüyor (xG ' + str(h_ht_xg) + ')' if h_ht_xg > a_ht_xg else 'İlk yarıda ' + a + ' üstün görünüyor (xG ' + str(a_ht_xg) + ')'}
+  • Güçlü fav: {"Yok — maç açık" if abs(p1-p2)<10 else (h if p1>p2 else a)}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+4️⃣  KG VAR–YOK & ÜST/ALT TAHMİNLERİ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  KG VAR  {bar_chart(kg_var)}  %{kg_var}
+  KG YOK  {bar_chart(kg_yok)}  %{kg_yok}
+  ─────────────────────────────────────────
+  1.5 ÜST {bar_chart(ust15)}  %{ust15}
+  2.5 ÜST {bar_chart(ust25)}  %{ust25}  │  2.5 ALT  %{alt25}
+  3.5 ÜST {bar_chart(ust35)}  %{ust35}  │  3.5 ALT  %{alt35}
+  4.5 ÜST {bar_chart(ust45)}  %{ust45}
+  ─────────────────────────────────────────
+  Yorum:
+  • Toplam xG: {round(hxg+axg,2)} → {"Gol ziyafeti bekleniyor" if hxg+axg>3 else "Dengeli, az gollü maç olabilir" if hxg+axg<2.2 else "Normal gol beklentisi"}
+  • {h} son {hform.get('n',0)} maçta {hform.get('btts',0)} kez KG VAR ({round(hform.get('btts',0)/max(hform.get('n',1),1)*100,1)}%)
+  • {a} son {aform.get('n',0)} maçta {aform.get('btts',0)} kez KG VAR ({round(aform.get('btts',0)/max(aform.get('n',1),1)*100,1)}%)
+  • {h} 2.5 Üst: {hform.get('over25',0)}/{hform.get('n',1)} | {a} 2.5 Üst: {aform.get('over25',0)}/{aform.get('n',1)}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+5️⃣  2/1 – 1/2 DÖNÜŞ TESPİTİ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  2/1 Dönüş ({a} İY önde → {h} MS kazanır):
+{donus_yorum_21()}
+
+  1/2 Dönüş ({h} İY önde → {a} MS kazanır):
+{donus_yorum_12()}
+
+  Gol Zamanlama:
+  • {h}: %{hform.get('ht_gol_orani',45)} İY · %{hform.get('st_gol_orani',55)} 2Y
+  • {a}: %{aform.get('ht_gol_orani',45)} İY · %{aform.get('st_gol_orani',55)} 2Y
+  • {"⚡ Her iki takım da 2Y'de daha tehlikeli → dönüş senaryoları izlenebilir" if hform.get('st_gol_orani',50)>54 and aform.get('st_gol_orani',50)>54 else "ℹ️ Gol dağılımı dengeli"}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+6️⃣  FORM & TAKTİK ANALİZİ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{form_yorum(hform, h, True)}
+
+{form_yorum(aform, a, False)}
+
+  H2H Özet: {h} {h2h.get('hw',0)}G – {h2h.get('dr',0)}B – {h2h.get('aw',0)}M
+  Son Skorlar: {" | ".join(h2h.get("scores",[])[:5]) or "Veri yok"}
+  H2H Ort Gol: {h2h.get('avg_goals','?')} | 2.5 Üst: {h2h.get('over25_pct','?')}% | KG VAR: {h2h.get('btts_pct','?')}%
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+7️⃣  ORAN–MODEL UYUMU
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Model MS Olasılıkları: 1=%{p1} | X=%{px} | 2=%{p2}
+  (İddaa oranı yoksa piyasa karşılaştırması yapılamıyor)
+
+  Bu oran aralığında tipik pattern:
+  • xG {hxg:.2f}-{axg:.2f} dengesiyle en sık biten skor: {best_ms[0]}-{best_ms[1]}
+  • KG VAR eğilimi: {"Güçlü" if kg_var>=60 else "Orta" if kg_var>=45 else "Zayıf"} (%{kg_var})
+  • 2.5 Üst eğilimi: {"Güçlü" if ust25>=62 else "Orta" if ust25>=48 else "Zayıf"} (%{ust25})
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+8️⃣  MAÇ RİSK SEVİYESİ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Seviye : {risk_lv}
+  Gerekçe: {risk_why}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+9️⃣  BANKO – ORTA RİSK – SÜRPRİZ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  🔒 BANKO    : {banko}
+               {banko_why}
+
+  ⚡ ORTA RİSK: {orta}
+               {orta_why}
+
+  💎 SÜRPRİZ  : {surpriz}
+               {surpriz_why}
+
+  🎯 SKOR SÜRPRİZİ: {skor_surp_str}
+               Toplam xG {round(hxg+axg,2)} destekli, yüksek oran value taşır
+
+══════════════════════════════════════════════════════════════════
+  ⚠️ Bu analiz istatistiksel model çıktısıdır.
+     Yatırım tavsiyesi değildir. Sorumluluğunuzda kullanın.
+══════════════════════════════════════════════════════════════════
+""".strip()
+    return report
+
+
+def run_analysis(d, claude_key):
+    """Claude varsa Claude, yoksa yerleşik motor."""
+    if claude_key and claude_key.strip().startswith("sk-ant"):
+        return claude_analyze(d["prompt"], claude_key)
+    else:
+        return local_analyze(d)
+
+
 # ─────────────────────────────────────────
 # SESSION STATE
 # ─────────────────────────────────────────
@@ -653,7 +992,7 @@ with c1:
 with c2:
     fetch_btn = st.button("🔍 Maçları Çek", type="primary", use_container_width=True)
 with c3:
-    all_btn = st.button("🤖 Tümünü Analiz Et", use_container_width=True)
+    all_btn = st.button("🤖 Tümünü Analiz Et (Ücretsiz)", use_container_width=True)
 
 st.divider()
 
@@ -743,8 +1082,6 @@ Olası nedenler:
 if all_btn:
     if not st.session_state.match_data:
         st.warning("Önce Maçları Çek!")
-    elif not claude_key:
-        st.error("⛔ Claude API Key gerekli.")
     else:
         bar2 = st.progress(0)
         items = list(st.session_state.match_data.items())
@@ -752,7 +1089,7 @@ if all_btn:
             hn = d["match"]["homeTeam"]["name"]
             an = d["match"]["awayTeam"]["name"]
             bar2.progress(i/len(items), text=f"({i+1}/{len(items)}) {hn} – {an}")
-            st.session_state.analyses[mid] = claude_analyze(d["prompt"], claude_key)
+            st.session_state.analyses[mid] = run_analysis(d, claude_key)
             time.sleep(0.5)
         bar2.progress(1.0)
         time.sleep(0.3); bar2.empty()
@@ -802,14 +1139,11 @@ if st.session_state.matches:
             ca, cb = st.columns([3,1])
             with cb:
                 if st.button("🤖 Analiz Et", key=f"a_{mid}"):
-                    if not claude_key:
-                        st.error("Claude API Key gerekli!")
-                    elif not d.get("prompt"):
+                    if not d.get("prompt"):
                         st.warning("Önce Maçları Çek!")
                     else:
                         with st.spinner(f"Derin analiz: {hn} – {an}..."):
-                            st.session_state.analyses[mid] = claude_analyze(
-                                d["prompt"], claude_key)
+                            st.session_state.analyses[mid] = run_analysis(d, claude_key)
 
             # Analiz sonucu
             if mid in st.session_state.analyses:
