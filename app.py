@@ -125,8 +125,10 @@ with st.sidebar:
     sel_label  = st.selectbox("Lig Seç", list(LEAGUES.keys()))
     sel_league = LEAGUES[sel_label]
     sel_date   = st.date_input("Maç Tarihi", value=date.today())
-    sel_season = st.number_input("Sezon", min_value=2020, max_value=2026,
-                                  value=sel_date.year if sel_date.month >= 7 else sel_date.year - 1)
+    # Sezon otomatik hesapla
+    auto_season = sel_date.year if sel_date.month >= 7 else sel_date.year - 1
+    sel_season = auto_season
+    st.caption(f"Sezon: {auto_season} (otomatik)")
     max_match  = st.slider("Maks. Maç Sayısı", 1, 15, 8)
 
     st.divider()
@@ -137,6 +139,8 @@ with st.sidebar:
     use_injuries = st.checkbox("Sakat/Cezalı", value=True)
     n_h2h        = st.slider("H2H Maç Sayısı", 3, 10, 6)
 
+    st.divider()
+    debug_mode = st.checkbox("🐛 Debug Modu (API yanıtını göster)", value=False)
     st.caption("API-Football free: 100 istek/gün")
 
 # ─────────────────────────────────────────────
@@ -144,7 +148,7 @@ with st.sidebar:
 # ─────────────────────────────────────────────
 AF_BASE = "https://v3.football.api-sports.io"
 
-def af_get(endpoint, key, params=None):
+def af_get(endpoint, key, params=None, debug=False):
     """api-sports.io doğrudan istek — RapidAPI değil."""
     headers = {"x-apisports-key": key}
     try:
@@ -155,23 +159,46 @@ def af_get(endpoint, key, params=None):
             time.sleep(62)
             r = requests.get(f"{AF_BASE}/{endpoint}", headers=headers,
                              params=params or {}, timeout=15)
+        remaining = r.headers.get("x-ratelimit-requests-remaining", "?")
         if r.status_code == 200:
             data = r.json()
-            remaining = r.headers.get("x-ratelimit-requests-remaining", "?")
+            if debug:
+                st.write(f"**DEBUG [{endpoint}]** params={params} | status=200 | kalan={remaining}")
+                st.write(f"response count: {len(data.get('response',[]))}")
+                errors = data.get('errors', {})
+                if errors:
+                    st.error(f"API errors: {errors}")
             return data, remaining
         else:
-            st.error(f"API {r.status_code}: {r.text[:200]}")
-            return {}, "?"
+            st.error(f"API Hatası {r.status_code} [{endpoint}]: {r.text[:300]}")
+            return {}, remaining
     except Exception as e:
         st.error(f"Bağlantı hatası [{endpoint}]: {e}")
         return {}, "?"
 
-def get_fixtures_today(key, league_id, season, target_date, limit):
-    data, rem = af_get("fixtures", key, {
-        "league": league_id, "season": season,
-        "date": target_date, "status": "NS"
-    })
-    return data.get("response", [])[:limit], rem
+def get_fixtures_today(key, league_id, season, target_date, limit, debug=False):
+    """Maçları çek — status filtresi yok, tüm durumlar gelsin."""
+    params = {"league": league_id, "season": season, "date": target_date}
+    data, rem = af_get("fixtures", key, params, debug=debug)
+    fixtures = data.get("response", [])
+
+    # Sonuç yoksa bir önceki sezonu dene
+    if not fixtures:
+        alt_season = season - 1
+        if debug:
+            st.info(f"Sezon {season} boş — {alt_season} deneniyor...")
+        params2 = {"league": league_id, "season": alt_season, "date": target_date}
+        data2, rem = af_get("fixtures", key, params2, debug=debug)
+        fixtures = data2.get("response", [])
+
+    # Oynanmış maçları (FT, AET, PEN) hariç tut, planlanmış ve oynanıyor olanları al
+    # Eğer tarih bugün veya gelecekse NS/TBD/1H/2H/HT hepsini al
+    # Eğer hiç planlanmış yoksa tümünü döndür (kullanıcı geçmiş tarihe bakmış olabilir)
+    scheduled = [f for f in fixtures if f.get("fixture", {}).get("status", {}).get("short") in
+                 ("NS", "TBD", "1H", "2H", "HT", "ET", "BT", "P", "SUSP", "INT", "PST", "CANC", "ABD", "WO", "AWD")]
+    if scheduled:
+        return scheduled[:limit], rem
+    return fixtures[:limit], rem
 
 def get_fixture_stats(key, fixture_id):
     """Maç bazlı takım istatistikleri (şut, isabetli şut, top hakimiyeti vb.)"""
@@ -843,12 +870,21 @@ if fetch_btn:
     with st.spinner("📡 Maçlar çekiliyor..."):
         fixtures, rem = get_fixtures_today(
             api_football_key, sel_league, sel_season,
-            sel_date.strftime("%Y-%m-%d"), max_match
+            sel_date.strftime("%Y-%m-%d"), max_match,
+            debug=debug_mode
         )
         st.session_state.remaining = rem
 
     if not fixtures:
-        st.warning("⚠️ Bu tarih/lig için planlanmış maç bulunamadı.")
+        st.error(f"""
+⚠️ **Maç bulunamadı.** Olası nedenler:
+- Seçilen tarihte bu ligde maç yok (sezon dışı veya boş hafta olabilir)
+- Sezon yanlış: Denenen sezon **{sel_season}** (ve {sel_season-1})
+- Lig ID: **{sel_league}** — doğru mu?
+- API key geçerli mi? → Debug Modu aç ve API yanıtını kontrol et
+
+**Çözüm dene:** Farklı bir tarih veya lig seç. Debug modunu aç.
+        """)
     else:
         st.session_state.fixtures = fixtures
         st.session_state.match_data = {}
