@@ -1183,8 +1183,9 @@ align-items:center">
     # 2-1, 1-2, 2-2, 3-2, 2-3 gibi özel scorlar
     NAMED_MS = {(2,1),(1,2),(2,2),(3,1),(1,3),(3,2),(2,3),(3,0),(0,3),(4,1),(1,4),(3,3)}
     NAMED_IY = {(2,0),(0,2),(2,1),(1,2),(2,2),(3,0),(0,3),(3,1),(1,3)}
-    special_ms_poisson = [(s,p) for (s,p) in sorted(ms_mat.items(),key=lambda x:-x[1]) if s in NAMED_MS][:8]
-    special_iy_poisson = [(s,p) for (s,p) in sorted(ht_mat.items(),key=lambda x:-x[1]) if s in NAMED_IY][:6]
+    # top_ms/top_ht zaten sıralı geldiği için direkt filtrele
+    special_ms_poisson = [(s,p) for (s,p) in top_ms if s in NAMED_MS][:8]
+    special_iy_poisson = [(s,p) for (s,p) in top_ht if s in NAMED_IY][:6]
 
     # İY Özel skorlar
     iy_src = iy_special if iy_special else [{"score":f"{s[0]}-{s[1]}","pct":str(round(p,1)),"why":""} for s,p in special_iy_poisson]
@@ -1286,10 +1287,11 @@ align-items:center">
         skor_val = preds.get("SKOR","") or ""
         iy_match = __import__("re").search(r"İY\s*(\d-\d)", skor_val, __import__("re").I)
         ms_match = __import__("re").search(r"MS\s*(\d-\d)", skor_val, __import__("re").I)
-        iy_s = iy_match.group(1) if iy_match else top_ht[0][0] if top_ht else "?"
-        ms_s = ms_match.group(1) if ms_match else f"{top_ms[0][0][0]}-{top_ms[0][0][1]}" if top_ms else "?"
-        if isinstance(iy_s, tuple): iy_s = f"{iy_s[0]}-{iy_s[1]}"
-        if isinstance(ms_s, tuple): ms_s = f"{ms_s[0]}-{ms_s[1]}"
+        def _score_str(val):
+            if isinstance(val, tuple): return f"{val[0]}-{val[1]}"
+            return str(val) if val else "?"
+        iy_s = iy_match.group(1) if iy_match else _score_str(top_ht[0][0] if top_ht else "?")
+        ms_s = ms_match.group(1) if ms_match else _score_str(top_ms[0][0] if top_ms else "?")
         tav_html += f"""
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
   <div style="background:#08050f;border:1px solid #4c1d95;border-radius:10px;
@@ -1429,13 +1431,24 @@ if st.session_state.matches:
                         st.session_state.analyses[mid]=groq_call(d["prompt"])
                     st.rerun()
             elif done and d:
-                render_vs_ui(
-                    d["match"],d["hf"],d["af"],d["h2h"],
-                    d["hxg"],d["axg"],d["h_htxg"],d["a_htxg"],
-                    d["stats"],d["top_ms"],d["top_ht"],
-                    d["h_stand"],d["a_stand"],d["h_sc"],d["a_sc"],
-                    st.session_state.analyses[mid]
-                )
+                try:
+                    render_vs_ui(
+                        d["match"],d["hf"],d["af"],d["h2h"],
+                        d["hxg"],d["axg"],d["h_htxg"],d["a_htxg"],
+                        d["stats"],d["top_ms"],d["top_ht"],
+                        d["h_stand"],d["a_stand"],d["h_sc"],d["a_sc"],
+                        st.session_state.analyses[mid]
+                    )
+                except Exception as _e:
+                    st.error(f"UI render hatası: {_e}")
+                    # Fallback: ham analiz metnini göster
+                    st.markdown(
+                        f'<div style="background:#060d1c;border:1px solid #1a2e4a;border-radius:10px;'
+                        f'padding:1.2rem;font-size:.83rem;color:#c0cfe0;white-space:pre-wrap;'
+                        f'max-height:600px;overflow-y:auto;font-family:monospace">'
+                        f'{st.session_state.analyses[mid]}</div>',
+                        unsafe_allow_html=True
+                    )
 else:
     st.markdown("""
 <div style="background:#0a1628;border:1px solid #0f2a45;border-radius:14px;padding:1.5rem 1.8rem">
