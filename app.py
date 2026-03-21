@@ -653,6 +653,16 @@ BANKO: [tahmin] — %[güven] — [gerekçe]
 ORTA: [tahmin] — %[güven] — [gerekçe]
 RİSKLİ: [tahmin] — [gerekçe]
 SKOR: İY [X-Y] + MS [X-Y] — [gerekçe]
+
+### 10) İLK YARI ÖZEL SKORLAR
+Bu maçta özellikle olası İY yüksek skorları: 2-1, 1-2, 2-2, 2-0, 0-2, 3-1, 1-3 gibi.
+Her biri için: [skor] (%[olasılık]) — [bu maça özgü kısa gerekçe]
+En az 5 İY skoru ver.
+
+### 11) MAÇ SONU ÖZEL SKORLAR
+Bu maçta özellikle olası yüksek/ilginç MS skorları: 2-1, 1-2, 2-2, 3-2, 2-3, 3-1, 1-3, 3-0, 0-3 gibi.
+Her biri için: [skor] (%[olasılık]) — [bu maça özgü kısa gerekçe]
+En az 6 MS skoru ver. SADECE yüksek gollü veya ilginç skorlara odaklan.
 """
 
 def groq_call(prompt, retries=3):
@@ -726,7 +736,26 @@ def parse_analysis(text):
                     if line.strip().upper().startswith(tag):
                         preds[tag.rstrip("İ").rstrip("Ş")] = line.split(":",1)[-1].strip()
 
-    return secs, scenarios, preds
+    # Özel skor listeleri — İY ve MS yüksek skorlar
+    def parse_score_list(text):
+        items = []
+        for line in text.split("\n"):
+            line = line.strip()
+            if not line: continue
+            m = re.search(r"(\d-\d)\s*\(%?\s*(\d+\.?\d*)\s*\)\s*[—–-]?\s*(.*)", line)
+            if m:
+                items.append({"score": m.group(1), "pct": m.group(2), "why": m.group(3).strip()})
+        return items
+
+    iy_special = []
+    ms_special = []
+    for k,v in secs.items():
+        if "İLK YARI ÖZEL" in k or "IY ÖZEL" in k or "ILK YARI" in k.replace("İ","I"):
+            iy_special = parse_score_list(v)
+        if "MAÇ SONU ÖZEL" in k or "MAC SONU" in k.replace("Ç","C"):
+            ms_special = parse_score_list(v)
+
+    return secs, scenarios, preds, iy_special, ms_special
 
 # ══════════════════════════════════════════════════════════════════
 # VS UI — Ana render fonksiyonu
@@ -738,7 +767,7 @@ def render_vs_ui(match, hf, af, h2h, hxg, axg, h_htxg, a_htxg,
     h   = match["homeTeam"]["name"]
     a   = match["awayTeam"]["name"]
     utc = match.get("utcDate","")[:16].replace("T"," ")
-    secs, scenarios, preds = parse_analysis(analysis_text)
+    secs, scenarios, preds, iy_special, ms_special = parse_analysis(analysis_text)
     fv  = lambda d,k,dv=0: d.get(k,dv) if d else dv
     hs  = h_stand or {}; as_ = a_stand or {}
 
@@ -1178,6 +1207,69 @@ align-items:center">
         sce_html += "</div>"
         st.markdown(sce_html, unsafe_allow_html=True)
 
+    # ── 11b. ÖZEL SKORLAR (İY + MS yüksek gollü) ──────────────
+    # Poisson'dan yüksek skorlu alternatifleri çek (fallback)
+    import re as _re
+    HIGH_IY  = [(s,p) for (s,p) in top_ht  if s[0]+s[1] >= 2 and p >= 0.5][:8]
+    HIGH_MS  = [(s,p) for (s,p) in top_ms  if s[0]+s[1] >= 2 and p >= 0.5][:10]
+    # 2-1, 1-2, 2-2, 3-2, 2-3 gibi özel scorlar
+    NAMED_MS = {(2,1),(1,2),(2,2),(3,1),(1,3),(3,2),(2,3),(3,0),(0,3),(4,1),(1,4),(3,3)}
+    NAMED_IY = {(2,0),(0,2),(2,1),(1,2),(2,2),(3,0),(0,3),(3,1),(1,3)}
+    special_ms_poisson = [(s,p) for (s,p) in sorted(ms_mat.items(),key=lambda x:-x[1]) if s in NAMED_MS][:8]
+    special_iy_poisson = [(s,p) for (s,p) in sorted(ht_mat.items(),key=lambda x:-x[1]) if s in NAMED_IY][:6]
+
+    # İY Özel skorlar
+    iy_src = iy_special if iy_special else [{"score":f"{s[0]}-{s[1]}","pct":str(round(p,1)),"why":""} for s,p in special_iy_poisson]
+    ms_src = ms_special if ms_special else [{"score":f"{s[0]}-{s[1]}","pct":str(round(p,1)),"why":""} for s,p in special_ms_poisson]
+
+    if iy_src or ms_src:
+        spec_html = """
+<div style="padding:1.2rem 1.8rem;border-bottom:1px solid #0a1e30">
+  <div class="dp-section-title">⚡ ÖZEL SKOR TAHMİNLERİ</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:8px">
+"""
+        # İY özel
+        spec_html += """    <div>
+      <div style="font-size:.65rem;color:#6d28d9;font-weight:700;letter-spacing:.1em;
+      text-transform:uppercase;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid #1a0a3c">
+      🕐 İLK YARI ÖZEL SKORLAR</div>"""
+        for it in iy_src[:6]:
+            spec_html += f"""
+      <div style="display:flex;justify-content:space-between;align-items:center;
+      padding:6px 10px;margin:4px 0;background:#0d0a1a;border:1px solid #2d1d5e;
+      border-radius:8px">
+        <div style="font-size:1.05rem;font-weight:800;color:#c4b5fd;
+        font-family:'JetBrains Mono',monospace">{it['score']}</div>
+        <div style="text-align:right">
+          <div style="font-size:.85rem;font-weight:700;color:#a78bfa;
+          font-family:'JetBrains Mono',monospace">%{it['pct']}</div>
+          {f'<div style="font-size:.62rem;color:#3a2a6e;margin-top:1px">{it["why"][:45]}</div>' if it.get("why") else ""}
+        </div>
+      </div>"""
+        spec_html += "    </div>"
+
+        # MS özel
+        spec_html += """    <div>
+      <div style="font-size:.65rem;color:#059669;font-weight:700;letter-spacing:.1em;
+      text-transform:uppercase;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid #052e16">
+      🏁 MAÇ SONU ÖZEL SKORLAR</div>"""
+        for it in ms_src[:8]:
+            spec_html += f"""
+      <div style="display:flex;justify-content:space-between;align-items:center;
+      padding:6px 10px;margin:4px 0;background:#040f09;border:1px solid #0d3320;
+      border-radius:8px">
+        <div style="font-size:1.05rem;font-weight:800;color:#34d399;
+        font-family:'JetBrains Mono',monospace">{it['score']}</div>
+        <div style="text-align:right">
+          <div style="font-size:.85rem;font-weight:700;color:#6ee7b7;
+          font-family:'JetBrains Mono',monospace">%{it['pct']}</div>
+          {f'<div style="font-size:.62rem;color:#1a4a30;margin-top:1px">{it["why"][:45]}</div>' if it.get("why") else ""}
+        </div>
+      </div>"""
+        spec_html += "    </div>"
+        spec_html += "  </div></div>"
+        st.markdown(spec_html, unsafe_allow_html=True)
+
     # ── 12. TAVSİYELER ────────────────────────────────────────
     banko  = preds.get("BANKO","")
     orta   = preds.get("ORTA","")
@@ -1219,6 +1311,32 @@ align-items:center">
   <div class="pred-body">
     <div class="pt">SKOR TAHMİNİ</div>
     <div class="pp">{skor[:120]}</div>
+  </div>
+</div>"""
+    # İY/MS skor kombinasyon kutuları
+    if secs.get("SKOR","") or preds.get("SKOR",""):
+        skor_val = preds.get("SKOR","") or ""
+        iy_match = __import__("re").search(r"İY\s*(\d-\d)", skor_val, __import__("re").I)
+        ms_match = __import__("re").search(r"MS\s*(\d-\d)", skor_val, __import__("re").I)
+        iy_s = iy_match.group(1) if iy_match else top_ht[0][0] if top_ht else "?"
+        ms_s = ms_match.group(1) if ms_match else f"{top_ms[0][0][0]}-{top_ms[0][0][1]}" if top_ms else "?"
+        if isinstance(iy_s, tuple): iy_s = f"{iy_s[0]}-{iy_s[1]}"
+        if isinstance(ms_s, tuple): ms_s = f"{ms_s[0]}-{ms_s[1]}"
+        tav_html += f"""
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+  <div style="background:#08050f;border:1px solid #4c1d95;border-radius:10px;
+  padding:12px;text-align:center">
+    <div style="font-size:.6rem;color:#6d28d9;font-weight:700;
+    letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">🕐 TAHMİN İY SKORU</div>
+    <div style="font-size:2rem;font-weight:800;color:#c4b5fd;
+    font-family:'JetBrains Mono',monospace">{iy_s}</div>
+  </div>
+  <div style="background:#040f09;border:1px solid #065f46;border-radius:10px;
+  padding:12px;text-align:center">
+    <div style="font-size:.6rem;color:#059669;font-weight:700;
+    letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">🏁 TAHMİN MS SKORU</div>
+    <div style="font-size:2rem;font-weight:800;color:#34d399;
+    font-family:'JetBrains Mono',monospace">{ms_s}</div>
   </div>
 </div>"""
     tav_html += "</div>"
