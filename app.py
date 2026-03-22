@@ -3318,35 +3318,48 @@ def auto_best_bet(lp, h_name, a_name, h_score, a_score, hf=None, af=None, league
 
 
 def _get_all_bets(lp, h_name, a_name, h_score, a_score, hf=None, af=None, league_code=None):
-    """Tüm anlamlı pazarları olasılığa göre sıralı döndür. %95+ve%50- hariç."""
-    is_ht  = lp.get("is_first_half", False)
-    ht_rem = lp.get("ht_remaining_min", 0)
+    """Tüm anlamlı pazarları olasılığa göre sıralı döndür. 54-90 arası prob kabul edilir."""
+    is_ht   = lp.get("is_first_half", False)
+    ht_rem  = lp.get("ht_remaining_min", 0)
+    ms_rem  = lp.get("remaining_min", 90)
+    total_g = int(h_score or 0) + int(a_score or 0)
+
+    # Çok az kaldıysa öneri yok
+    if ms_rem <= 3:
+        return []
+    if is_ht and ht_rem <= 2:
+        return []
 
     cands = []
-    def add(mkt, prob, why, pri):
+    def add(mkt, prob, why, pri, done_at=None):
+        """done_at: bu gol sayısına ulaşıldıysa pazar zaten bitti, önerme."""
+        if done_at is not None and total_g > done_at:
+            return  # zaten gerçekleşti
         p = float(prob or 0)
-        if 52 <= p <= 93:
+        if 54 <= p <= 90:
             cands.append({"market": mkt, "prob": p, "why": why, "priority": pri})
 
-    add(f"{h_name} Gol Atar", lp.get("p_next_h",0),   f"ev baskısı", 1)
-    add(f"{a_name} Gol Atar", lp.get("p_next_a",0),   f"dep atağı", 2)
-    # MS üst/alt — skip_if_done: eşik zaten geçildiyse önerme
-    add("MS 1.5 Üst",  lp.get("o15",0),  "2+ gol",       4,  skip_if_done=0)   # 1 gol varsa "1.5 üst" done
-    add("MS 1.5 Alt",  lp.get("u15",0),  "max 1 gol",    14, skip_if_done=None)
-    add("MS 2.5 Üst",  lp.get("o25",0),  "3+ gol",       6,  skip_if_done=1)   # 2 gol varsa done
-    add("MS 2.5 Alt",  lp.get("u25",0),  "max 2 gol",    8,  skip_if_done=None)
-    add("MS 3.5 Üst",  lp.get("o35",0),  "4+ gol",       9,  skip_if_done=2)
-    add("MS 3.5 Alt",  lp.get("u35",0),  "max 3 gol",    10, skip_if_done=None)
-    add("KG VAR",      lp.get("p_kg_var",0), "her iki takım atar", 11)
+    add(f"{h_name} Gol Atar", lp.get("p_next_h", 0), "ev baskısı", 1)
+    add(f"{a_name} Gol Atar", lp.get("p_next_a", 0), "dep atağı",  2)
+
+    add("MS 1.5 Üst", lp.get("o15", 0), "2+ gol",    4,  done_at=0)
+    add("MS 1.5 Alt", lp.get("u15", 0), "max 1 gol", 14)
+    add("MS 2.5 Üst", lp.get("o25", 0), "3+ gol",    6,  done_at=1)
+    add("MS 2.5 Alt", lp.get("u25", 0), "max 2 gol", 8)
+    add("MS 3.5 Üst", lp.get("o35", 0), "4+ gol",    9,  done_at=2)
+    add("MS 3.5 Alt", lp.get("u35", 0), "max 3 gol", 10)
+    add("KG VAR",     lp.get("p_kg_var", 0), "her iki takım atar", 11)
+
     if total_g == 0:
-        add("İlk Gol Var", lp.get("p_next_goal",0), "maçta gol olur", 5)
+        add("İlk Gol Var", lp.get("p_next_goal", 0), "maçta gol olur", 5)
+
     if is_ht and ht_rem >= 4:
-        add("İY 0.5 Üst", lp.get("ht_o5",0),  f"İY gol gelir {ht_rem}dk", 3, skip_if_done=0)
-        add("İY 0.5 Alt", lp.get("ht_u5",0),  f"İY gol gelmez",          12)
-        add("İY KG VAR",  lp.get("ht_kg_var",0), "İY her iki takım atar", 13)
+        add("İY 0.5 Üst", lp.get("ht_o5",    0), f"İY gol gelir {ht_rem}dk", 3, done_at=0)
+        add("İY 0.5 Alt", lp.get("ht_u5",    0), "İY gol gelmez",            12)
+        add("İY KG VAR",  lp.get("ht_kg_var", 0), "İY her iki takım atar",   13)
     if is_ht and ht_rem >= 7:
-        add("İY 1.5 Üst", lp.get("ht_o15",0), f"İY 2+ gol", 7, skip_if_done=0)
-        add("İY 1.5 Alt", lp.get("ht_u15",0), f"İY max 1 gol", 15)
+        add("İY 1.5 Üst", lp.get("ht_o15", 0), f"İY 2+ gol {ht_rem}dk", 7, done_at=0)
+        add("İY 1.5 Alt", lp.get("ht_u15", 0), "İY max 1 gol",           15)
 
     cands.sort(key=lambda x: (-x["prob"], x["priority"]))
     seen, result = set(), []
