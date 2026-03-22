@@ -1638,6 +1638,54 @@ FD_TO_ODDSAPI_SPORT = {
     "BSA": "soccer_brazil_campeonato",
 }
 
+
+@st.cache_data(ttl=60, show_spinner=False)
+def fetch_live_odds_api(api_key, sport_key):
+    try:
+        r = requests.get(
+            f"{ODDS_API_BASE}/sports/{sport_key}/odds/",
+            params={"apiKey":api_key,"regions":"eu","markets":"h2h,totals",
+                    "oddsFormat":"decimal","bookmakers":"bet365,pinnacle,unibet,williamhill"},
+            timeout=15)
+        return r.json() if r.status_code == 200 else []
+    except:
+        return []
+
+def get_live_match_odds(api_key, sport_key, hn, an):
+    if not api_key or not sport_key:
+        return None
+    ck = f"liveodds_{sport_key}_{hn[:5]}"
+    if ck not in st.session_state:
+        st.session_state[ck] = fetch_live_odds_api(api_key, sport_key)
+    data = st.session_state.get(ck, [])
+    for game in data:
+        if not (fuzzy_match_team(game.get("home_team",""), hn) and
+                fuzzy_match_team(game.get("away_team",""), an)):
+            continue
+        bms = game.get("bookmakers", [])
+        bm  = next((b for b in bms if "bet365"  in b.get("key","")), None) or               next((b for b in bms if "pinnacle" in b.get("key","")), None) or               (bms[0] if bms else None)
+        if not bm:
+            continue
+        res = {"h2h":{}, "totals":{}, "source": bm.get("title","?")}
+        for mkt in bm.get("markets",[]):
+            if mkt.get("key") == "h2h":
+                for oc in mkt.get("outcomes",[]):
+                    p = _safe_float(oc.get("price"))
+                    n = oc.get("name","")
+                    if   n == game["home_team"]: res["h2h"]["1"] = round(p,2)
+                    elif n == game["away_team"]: res["h2h"]["2"] = round(p,2)
+                    else:                        res["h2h"]["X"] = round(p,2)
+            elif mkt.get("key") == "totals":
+                for oc in mkt.get("outcomes",[]):
+                    pt  = _safe_float(oc.get("point"))
+                    pr  = _safe_float(oc.get("price"))
+                    if not pt or not pr: continue
+                    dr  = "over" if "over" in oc.get("name","").lower() else "under"
+                    res["totals"][f"{pt}_{dr}"] = round(pr,2)
+        if res["h2h"] or res["totals"]:
+            return res
+    return None
+
 @st.cache_data(ttl=1800, show_spinner=False)
 def fetch_odds_api(api_key, sport_key):
     """The Odds API'den tüm maçların oranlarını çek."""
@@ -3317,55 +3365,73 @@ def auto_best_bet(lp, h_name, a_name, h_score, a_score, hf=None, af=None, league
     return meaningful[0]
 
 
-def _get_all_bets(lp, h_name, a_name, h_score, a_score, hf=None, af=None, league_code=None):
-    """Tüm anlamlı pazarları olasılığa göre sıralı döndür. 54-90 arası prob kabul edilir."""
+def _get_all_bets(lp, h_name, a_name, h_score, a_score, hf=None, af=None, league_code=None, live_odds=None):
+    """Olasılık + canlı oran bazlı pazar önerileri. Zaten gerçekleşmiş pazarlar hariç."""
     is_ht   = lp.get("is_first_half", False)
     ht_rem  = lp.get("ht_remaining_min", 0)
     ms_rem  = lp.get("remaining_min", 90)
     total_g = int(h_score or 0) + int(a_score or 0)
+    if ms_rem <= 3: return []
+    if is_ht and ht_rem <= 2: return []
 
-    # Çok az kaldıysa öneri yok
-    if ms_rem <= 3:
-        return []
-    if is_ht and ht_rem <= 2:
-        return []
+    totals   = (live_odds or {}).get("totals", {})
+    h2h_o    = (live_odds or {}).get("h2h", {})
+    has_odds = bool(totals or h2h_o)
 
     cands = []
-    def add(mkt, prob, why, pri, done_at=None):
-        """done_at: bu gol sayısına ulaşıldıysa pazar zaten bitti, önerme."""
-        if done_at is not None and total_g > done_at:
-            return  # zaten gerçekleşti
+    def add(mkt, prob, why, pri, done_at=None, odd=None):
+        if done_at is not None and total_g > done_at: return
         p = float(prob or 0)
-        if 54 <= p <= 90:
-            cands.append({"market": mkt, "prob": p, "why": why, "priority": pri})
+        if has_odds:
+            if odd is None or float(odd) <= 1.10: return  # oran yok veya işe yaramaz
+            imp  = 100 / float(odd)
+            edge = round(p - imp, 1)
+            label = f"oran {odd}" + (f" ⚡VALUE +{edge:.0f}%" if edge >= 3 else "")
+            cands.append({"market":mkt,"prob":p,"odd":odd,"why":f"{why} | {label}","priority":pri,"value":edge})
+        else:
+            if 55 <= p <= 90:
+                cands.append({"market":mkt,"prob":p,"odd":None,"why":why,"priority":pri,"value":0})
 
-    add(f"{h_name} Gol Atar", lp.get("p_next_h", 0), "ev baskısı", 1)
-    add(f"{a_name} Gol Atar", lp.get("p_next_a", 0), "dep atağı",  2)
-
-    add("MS 1.5 Üst", lp.get("o15", 0), "2+ gol",    4,  done_at=0)
-    add("MS 1.5 Alt", lp.get("u15", 0), "max 1 gol", 14)
-    add("MS 2.5 Üst", lp.get("o25", 0), "3+ gol",    6,  done_at=1)
-    add("MS 2.5 Alt", lp.get("u25", 0), "max 2 gol", 8)
-    add("MS 3.5 Üst", lp.get("o35", 0), "4+ gol",    9,  done_at=2)
-    add("MS 3.5 Alt", lp.get("u35", 0), "max 3 gol", 10)
-    add("KG VAR",     lp.get("p_kg_var", 0), "her iki takım atar", 11)
-
-    if total_g == 0:
-        add("İlk Gol Var", lp.get("p_next_goal", 0), "maçta gol olur", 5)
-
+    # h2h
+    add(f"{h_name} Kazanır", lp.get("p_next_h",50)*0.7, "1 kazanır", 20, odd=h2h_o.get("1"))
+    add("Beraberlik",        30,                          "beraberlik",21, odd=h2h_o.get("X"))
+    add(f"{a_name} Kazanır", lp.get("p_next_a",50)*0.7, "2 kazanır", 22, odd=h2h_o.get("2"))
+    # Sonraki gol
+    add(f"{h_name} Gol Atar", lp.get("p_next_h",0), "ev baskısı", 1)
+    add(f"{a_name} Gol Atar", lp.get("p_next_a",0), "dep atağı",  2)
+    # Totals (oran bazlı)
+    for thr_str, over_odd in totals.items():
+        if "_over" not in thr_str: continue
+        try: thr = float(thr_str.replace("_over",""))
+        except: continue
+        under_odd  = totals.get(f"{thr}_under")
+        done_thr   = int(thr - 0.5)
+        add(f"{thr} Üst", lp.get(f"o{int(thr*10)}",0), f"{int(thr+0.5)}+ gol", int(thr*10)+1, done_at=done_thr, odd=over_odd)
+        add(f"{thr} Alt", lp.get(f"u{int(thr*10)}",0), f"max {int(thr-0.5)} gol", int(thr*10)+2, odd=under_odd)
+    # Oran yoksa fallback
+    if not has_odds:
+        add("MS 1.5 Üst",lp.get("o15",0),"2+ gol",   4,done_at=0)
+        add("MS 1.5 Alt",lp.get("u15",0),"max 1 gol",14)
+        add("MS 2.5 Üst",lp.get("o25",0),"3+ gol",   6,done_at=1)
+        add("MS 2.5 Alt",lp.get("u25",0),"max 2 gol",8)
+        add("MS 3.5 Alt",lp.get("u35",0),"max 3 gol",10)
+        add("KG VAR",    lp.get("p_kg_var",0),"her iki takım atar",11)
+        if total_g == 0:
+            add("İlk Gol",lp.get("p_next_goal",0),"maçta gol olur",5)
+    # İY
     if is_ht and ht_rem >= 4:
-        add("İY 0.5 Üst", lp.get("ht_o5",    0), f"İY gol gelir {ht_rem}dk", 3, done_at=0)
-        add("İY 0.5 Alt", lp.get("ht_u5",    0), "İY gol gelmez",            12)
-        add("İY KG VAR",  lp.get("ht_kg_var", 0), "İY her iki takım atar",   13)
+        add("İY 0.5 Üst",lp.get("ht_o5",0),   f"İY gol gelir {ht_rem}dk",3,done_at=0)
+        add("İY 0.5 Alt",lp.get("ht_u5",0),   "İY gol gelmez",           12)
+        add("İY KG VAR", lp.get("ht_kg_var",0),"İY her iki takım atar",  13)
     if is_ht and ht_rem >= 7:
-        add("İY 1.5 Üst", lp.get("ht_o15", 0), f"İY 2+ gol {ht_rem}dk", 7, done_at=0)
-        add("İY 1.5 Alt", lp.get("ht_u15", 0), "İY max 1 gol",           15)
+        add("İY 1.5 Üst",lp.get("ht_o15",0),f"İY 2+ gol {ht_rem}dk",7,done_at=0)
+        add("İY 1.5 Alt",lp.get("ht_u15",0),"İY max 1 gol",          15)
 
-    cands.sort(key=lambda x: (-x["prob"], x["priority"]))
-    seen, result = set(), []
+    cands.sort(key=lambda x:(-x.get("value",0),-x["prob"],x["priority"]))
+    seen,result=[],[]
     for c in cands:
         if c["market"] not in seen:
-            seen.add(c["market"])
+            seen.append(c["market"])
             result.append(c)
     return result[:6]
 
@@ -4196,8 +4262,10 @@ padding:2rem;text-align:center;color:#4a6880;font-size:.82rem">
             lstat_ = parse_live_stats(ss_raw_)
             lc_    = live_league if live_league != "Tüm Ligler" else None
             lp_    = calc_live_goal_probability(lstat_, min_, lhsc_, lasc_, ld["hf"], ld["af"], league_code=lc_)
+            _sk=FD_TO_ODDSAPI_SPORT.get(lc_ or "","")
+            _lo=get_live_match_odds(ODDS_API_KEY_DEFAULT,_sk,lm_["homeTeam"]["name"],lm_["awayTeam"]["name"]) if _sk else None
             match_bets = _get_all_bets(lp_, lm_["homeTeam"]["name"], lm_["awayTeam"]["name"],
-                                        lhsc_, lasc_, ld["hf"], ld["af"], league_code=lc_)
+                                        lhsc_, lasc_, ld["hf"], ld["af"], league_code=lc_, live_odds=_lo)
             for bp in match_bets[:2]:  # Her maçtan max 2 tavsiye
                 all_picks.append({
                     "lid": lid, "lm": lm_, "lp": lp_,
@@ -4305,7 +4373,9 @@ padding:1rem 1.2rem;margin-bottom:1rem">
                             display_pick = None  # İkisi zaten gösterildi
                     # Tüm anlamlı pazarları hesapla ve sıralı göster
                     lc_tmp2 = live_league if live_league != "Tüm Ligler" else None
-                    all_auto = _get_all_bets(lp, lhn, lan, lhsc, lasc, ld["hf"], ld["af"], league_code=lc_tmp2)
+                    _sk2=FD_TO_ODDSAPI_SPORT.get(lc_tmp2 or "","")
+                    _lo2=get_live_match_odds(ODDS_API_KEY_DEFAULT,_sk2,lhn,lan) if _sk2 else None
+                    all_auto = _get_all_bets(lp, lhn, lan, lhsc, lasc, ld["hf"], ld["af"], league_code=lc_tmp2, live_odds=_lo2)
                     if all_auto:
                         rows_html = ""
                         for bp in all_auto[:5]:
