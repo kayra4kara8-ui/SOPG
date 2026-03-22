@@ -18,14 +18,7 @@ def _safe_minute(val, default=45):
 def calc_live_minute(m):
     """
     football-data.org maç nesnesinden gerçek oyun dakikasını hesapla.
-    API doğrudan 'minute' vermez — utcDate + now + status'tan türetilir.
-
-    Mantık:
-    - PAUSED (devre arası) → 45
-    - IN_PLAY, elapsed <= 45  → 1. yarı, elapsed = dakika
-    - IN_PLAY, elapsed 45-60 → devre arası henüz bitmedi → 45
-    - IN_PLAY, elapsed > 60  → 2Y: elapsed - 15 (devre arasını çıkar)
-    - Sonuç 1-95 arasında sınırlanır
+    utcDate her zaman UTC'dir ("2025-03-22T20:00:00Z" formatında).
     """
     import datetime as _dt
 
@@ -38,22 +31,24 @@ def calc_live_minute(m):
         return 45
 
     try:
-        # utcDate format: "2025-03-22T20:00:00Z"
-        start = _dt.datetime.strptime(utc_str[:19].replace("T", " "), "%Y-%m-%d %H:%M:%S")
-    except:
+        # "2025-03-22T20:00:00Z" → Z suffix'ini temizle
+        clean = utc_str.rstrip("Z").replace("T", " ")[:19]
+        start = _dt.datetime.strptime(clean, "%Y-%m-%d %H:%M:%S")
+    except Exception:
         return 45
 
-    now = _dt.datetime.utcnow()
+    # datetime.utcnow() UTC döndürür — utcDate de UTC — doğru karşılaştırma
+    now     = _dt.datetime.utcnow()
     elapsed = max(0, int((now - start).total_seconds() / 60))
 
-    if elapsed <= 45:
-        # 1. yarı
-        return max(1, min(45, elapsed))
-    elif elapsed <= 62:
-        # Devre arası henüz bitmemiş olabilir (45dk + ~17dk devre arası)
+    # 1Y devam
+    if elapsed <= 46:
+        return max(1, min(46, elapsed))
+    # Devre arası (~45dk + ~17dk)
+    elif elapsed <= 63:
         return 45
+    # 2Y: devre arasını (~17dk) çıkar
     else:
-        # 2. yarı: toplam geçen süreden devre arasını (~17dk) çıkar
         minute = elapsed - 17
         return max(46, min(95, minute))
 
@@ -3208,6 +3203,91 @@ def _extract_simdi_al(text):
         parts = full.split("—")
         return {"market": parts[0].strip(), "why": parts[1].strip() if len(parts) > 1 else ""}
     return None
+def auto_best_bet(lp, h_name, a_name, h_score, a_score, hf=None, af=None, league_code=None):
+    """
+    Olasılık tablosundan otomatik en iyi canlı bahsi seç.
+    Groq analizine gerek yok — saf istatistik.
+    """
+    fv = lambda d, k, dv=0: d.get(k, dv) if d else dv
+    is_ht      = lp.get("is_first_half", False)
+    ht_rem     = lp.get("ht_remaining_min", 0)
+    ms_rem     = lp.get("remaining_min", 90)
+    league_avg = lp.get("league_avg", 2.70)
+    low        = league_avg < 2.65
+
+    cands = []
+    def add(mkt, prob, why, pri):
+        cands.append({"market": mkt, "prob": float(prob), "why": why, "priority": pri})
+
+    up = 5 if low else 0   # alt pazar bonusu
+    dn = 5 if low else 0   # üst pazar cezası
+
+    # Ev sahibi gol atar (0.5 üst)
+    pnh = lp.get("p_next_h", 0)
+    if pnh >= 70:
+        add(f"{h_name} Gol Atar (0.5 Üst)", pnh, f"ev baskısı %{pnh}", 1)
+
+    # Deplasman gol atar (0.5 üst)
+    pna = lp.get("p_next_a", 0)
+    if pna >= 70:
+        add(f"{a_name} Gol Atar (0.5 Üst)", pna, f"dep atağı %{pna}", 2)
+
+    # İY 0.5 Üst
+    if is_ht and ht_rem >= 5:
+        v = lp.get("ht_o5", 0)
+        if v >= 62 - dn:
+            add("İY 0.5 Üst", v, f"İY gol gelir {ht_rem}dk kaldı %{v}", 3)
+
+    # MS 1.5 Üst
+    v = lp.get("o15", 0)
+    if v >= 65 - dn:
+        add("MS 1.5 Üst", v, f"2+ gol bekleniyor %{v}", 4)
+
+    # MS 0.5 Üst (golsüz maç)
+    if h_score + a_score == 0:
+        v = lp.get("p_next_goal", 0)
+        if v >= 80:
+            add("MS 0.5 Üst (İlk Gol)", v, f"henüz gol yok beklenti %{v}", 5)
+
+    # MS 2.5 Üst
+    v = lp.get("o25", 0)
+    if v >= 65 - dn:
+        add("MS 2.5 Üst", v, f"3+ gol bekleniyor %{v}", 6)
+
+    # İY 1.5 Üst
+    if is_ht and ht_rem >= 8:
+        v = lp.get("ht_o15", 0)
+        if v >= 60 - dn:
+            add("İY 1.5 Üst", v, f"İY 2+ gol %{v}", 7)
+
+    # MS 2.5 Alt (az kaldı, düşük skor)
+    v = lp.get("u25", 0)
+    if v >= 65 + up and ms_rem <= 55:
+        add("MS 2.5 Alt", v, f"düşük gol beklentisi %{v}", 8)
+
+    # İY 0.5 Alt (az kaldı, golsüz, düşük gol ligi)
+    if is_ht and ht_rem <= 10 and h_score + a_score == 0 and low:
+        v = lp.get("ht_u5", 0)
+        if v >= 58:
+            add("İY 0.5 Alt", v, f"az kaldı golsüz %{v}", 9)
+
+    # KG VAR
+    v = lp.get("p_kg_var", 0)
+    if v >= 70:
+        add("KG VAR", v, f"her iki takım gol atar %{v}", 10)
+
+    # İY KG VAR
+    if is_ht and ht_rem >= 6:
+        v = lp.get("ht_kg_var", 0)
+        if v >= 62:
+            add("İY KG VAR", v, f"İY her iki takım %{v}", 11)
+
+    if not cands:
+        return None
+    best = max(cands, key=lambda x: (x["prob"], -x["priority"]))
+    return best
+
+
 
 
 # ── VS UI ── (mevcut render_vs_ui burada)
@@ -4023,36 +4103,64 @@ padding:2rem;text-align:center;color:#4a6880;font-size:.82rem">
         )
 
         # ── EN İYİ TAVSİYE BANNER ────────────────────────────────
-        top_pick = None
+        # auto_best_bet ile her maçtan en iyi bahsi bul, olasılıkla sırala
+        all_picks = []
         for lid, ld in sorted_matches:
-            atxt = st.session_state["live_analyses"].get(lid, "")
-            pick = _extract_simdi_al(atxt)
-            if pick and pick.get("market"):
-                lm   = ld["match"]
-                top_pick = {
-                    "match": f"{lm['homeTeam']['name']} vs {lm['awayTeam']['name']}",
-                    "score": f"{lm.get('score',{}).get('fullTime',{}).get('home') or 0}–{lm.get('score',{}).get('fullTime',{}).get('away') or 0}",
-                    "minute": calc_live_minute(lm),
-                    **pick
-                }
-                break
+            lm_   = ld["match"]
+            lhsc_ = lm_.get("score",{}).get("fullTime",{}).get("home") or 0
+            lasc_ = lm_.get("score",{}).get("fullTime",{}).get("away") or 0
+            min_  = calc_live_minute(lm_)
+            ss_ev_, ss_raw_ = fetch_sofascore_live_event(lm_["homeTeam"]["name"], lm_["awayTeam"]["name"])
+            lstat_ = parse_live_stats(ss_raw_)
+            lc_    = live_league if live_league != "Tüm Ligler" else None
+            lp_    = calc_live_goal_probability(lstat_, min_, lhsc_, lasc_, ld["hf"], ld["af"], league_code=lc_)
+            pick_  = auto_best_bet(lp_, lm_["homeTeam"]["name"], lm_["awayTeam"]["name"],
+                                   lhsc_, lasc_, ld["hf"], ld["af"], league_code=lc_)
+            if pick_:
+                all_picks.append({
+                    "lid": lid, "lm": lm_, "lp": lp_,
+                    "match": f"{lm_['homeTeam']['name']} vs {lm_['awayTeam']['name']}",
+                    "score": f"{lhsc_}–{lasc_}",
+                    "minute": min_,
+                    **pick_
+                })
+
+        all_picks.sort(key=lambda x: x["prob"], reverse=True)
+        top_pick = all_picks[0] if all_picks else None
 
         if top_pick:
-            st.markdown(f"""
-<div style="background:linear-gradient(135deg,#04180a,#062010);border:2px solid #3ecf7a;
-border-radius:12px;padding:1rem 1.4rem;margin-bottom:1rem;
-display:flex;align-items:center;gap:14px">
-  <div style="font-size:1.6rem">🏆</div>
+            # Tüm aktif tavsiyeleri üst bannerda göster
+            banner_items = all_picks[:4]  # max 4 tavsiye
+            items_html = ""
+            for i, bp in enumerate(banner_items):
+                prob_color = "#3ecf7a" if bp["prob"] >= 75 else "#f5a623"
+                border_color = "#3ecf7a" if i == 0 else "#1c2e44"
+                bg_color = "#04180a" if i == 0 else "#0d1829"
+                items_html += f"""
+<div style="background:{bg_color};border:1px solid {border_color};border-radius:9px;
+padding:.7rem 1rem;display:flex;align-items:center;gap:10px">
   <div style="flex:1">
-    <div style="font-size:.54rem;font-weight:800;letter-spacing:.15em;color:#3ecf7a;
-    text-transform:uppercase;margin-bottom:3px">ŞİMDİ AL — En Güçlü Canlı Tavsiye</div>
-    <div style="font-size:1.1rem;font-weight:800;color:#d0dce8;
-    font-family:JetBrains Mono,monospace">{top_pick['market']}</div>
-    <div style="font-size:.72rem;color:#7a9ab8;margin-top:2px">{top_pick['match']} &nbsp;·&nbsp; {top_pick['score']} &nbsp;·&nbsp; {top_pick['minute']}'</div>
-    <div style="font-size:.68rem;color:#4a6880;margin-top:3px">{top_pick.get('why','')}</div>
+    <div style="font-size:.9rem;font-weight:800;color:#d0dce8;
+    font-family:JetBrains Mono,monospace">{bp['market']}</div>
+    <div style="font-size:.62rem;color:#4a6880;margin-top:2px">
+      {bp['match']} · {bp['score']} · {bp['minute']}'
+    </div>
+    <div style="font-size:.62rem;color:#7a9ab8;margin-top:1px">{bp.get('why','')}</div>
   </div>
-  <div style="background:#3ecf7a;color:#04180a;font-size:.7rem;font-weight:800;
-  letter-spacing:.08em;padding:5px 12px;border-radius:6px;white-space:nowrap">AL ✓</div>
+  <div style="background:{prob_color};color:#04180a;font-size:.72rem;font-weight:800;
+  padding:4px 10px;border-radius:5px;white-space:nowrap">%{bp['prob']:.0f}</div>
+</div>"""
+
+            st.markdown(f"""
+<div style="background:#09101e;border:2px solid #3ecf7a;border-radius:12px;
+padding:1rem 1.2rem;margin-bottom:1rem">
+  <div style="font-size:.56rem;font-weight:800;letter-spacing:.15em;color:#3ecf7a;
+  text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:6px">
+    🏆 ŞİMDİ AL — Aktif Canlı Tavsiyeler (Olasılığa Göre Sıralı)
+  </div>
+  <div style="display:flex;flex-direction:column;gap:6px">
+    {items_html}
+  </div>
 </div>""", unsafe_allow_html=True)
 
         # ── HER MAÇ PANELİ ────────────────────────────────────────
@@ -4090,17 +4198,37 @@ display:flex;align-items:center;gap:14px">
                 if done:
                     atxt = st.session_state["live_analyses"][lid]
 
-                    # ŞİMDİ AL banner (maç içinde)
-                    pick = _extract_simdi_al(atxt)
-                    if pick and pick.get("market"):
+                    # ŞİMDİ AL banner (maç içinde) — auto_best_bet kullan
+                    lc_tmp = live_league if live_league != "Tüm Ligler" else None
+                    auto_pick = auto_best_bet(lp, lhn, lan, lhsc, lasc, ld["hf"], ld["af"], league_code=lc_tmp)
+                    groq_pick = _extract_simdi_al(atxt)
+                    # İkisini karşılaştır: hangisi daha yüksek olasılıklı
+                    display_pick = auto_pick
+                    if groq_pick and groq_pick.get("market"):
+                        # Groq'un verdiği pazar auto_pick'ten farklıysa ikisini de göster
+                        if auto_pick and auto_pick["market"] != groq_pick["market"]:
+                            st.markdown(f"""
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:.6rem">
+  <div style="background:#04180a;border:1px solid #3ecf7a;border-radius:8px;padding:.55rem .9rem">
+    <div style="font-size:.5rem;color:#3ecf7a;font-weight:700;text-transform:uppercase;margin-bottom:2px">📊 Model</div>
+    <div style="font-size:.85rem;font-weight:800;color:#d0dce8;font-family:JetBrains Mono,monospace">{auto_pick['market']}</div>
+    <div style="font-size:.6rem;color:#4a6880">%{auto_pick['prob']:.0f} · {auto_pick.get('why','')[:50]}</div>
+  </div>
+  <div style="background:#060f20;border:1px solid #1d4ed8;border-radius:8px;padding:.55rem .9rem">
+    <div style="font-size:.5rem;color:#4c9eff;font-weight:700;text-transform:uppercase;margin-bottom:2px">🤖 AI</div>
+    <div style="font-size:.85rem;font-weight:800;color:#d0dce8;font-family:JetBrains Mono,monospace">{groq_pick['market']}</div>
+    <div style="font-size:.6rem;color:#4a6880">{groq_pick.get('why','')[:60]}</div>
+  </div>
+</div>""", unsafe_allow_html=True)
+                            display_pick = None  # İkisi zaten gösterildi
+                    if display_pick:
                         st.markdown(f"""
 <div style="background:#04180a;border:1px solid #3ecf7a;border-radius:8px;
 padding:.6rem 1rem;margin-bottom:.6rem;display:flex;align-items:center;gap:10px">
-  <span style="font-size:.56rem;font-weight:800;letter-spacing:.12em;color:#3ecf7a;
-  text-transform:uppercase">ŞİMDİ AL</span>
-  <span style="font-size:.9rem;font-weight:800;color:#d0dce8;
-  font-family:JetBrains Mono,monospace">{pick['market']}</span>
-  <span style="font-size:.68rem;color:#4a6880;flex:1">{pick.get('why','')}</span>
+  <span style="font-size:.56rem;font-weight:800;letter-spacing:.12em;color:#3ecf7a;text-transform:uppercase">ŞİMDİ AL</span>
+  <span style="font-size:.9rem;font-weight:800;color:#d0dce8;font-family:JetBrains Mono,monospace">{display_pick['market']}</span>
+  <span style="font-size:.68rem;color:#4a6880;flex:1">{display_pick.get('why','')}</span>
+  <span style="background:#3ecf7a;color:#04180a;font-size:.68rem;font-weight:800;padding:3px 9px;border-radius:4px">%{display_pick["prob"]:.0f}</span>
 </div>""", unsafe_allow_html=True)
 
                     # Tam analiz paneli
