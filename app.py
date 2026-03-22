@@ -335,21 +335,20 @@ with st.sidebar:
 
     st.divider()
     st.markdown("### 💰 Oran & Pattern Ayarları")
-    auto_odds   = st.checkbox("✅ Oranları otomatik çek (football-data.co.uk)", value=True,
-                               help="Maçları çekerken oranlar otomatik eşleştirilir")
-    tolerance   = st.slider("Oran Toleransı (±)", 0.10, 0.60, 0.30, 0.05,
-                             help="Pattern aramasında kabul edilen oran farkı")
-    n_seasons   = st.slider("Kaç Sezon Analiz Edilsin", 1, 5, 3)
-    # Fallback: manuel giriş
+    st.caption("football-data.co.uk → Kayıt yok · Key yok · Otomatik")
+    auto_odds = st.checkbox("✅ Oranları otomatik çek", value=True)
+    tolerance = st.slider("Oran Toleransı (±)", 0.10, 0.60, 0.30, 0.05,
+                           help="Geçmiş pattern aramasında kabul edilen oran farkı")
+    n_seasons = st.slider("Kaç Sezon Analiz Edilsin", 1, 5, 3)
     use_manual_odds = False
     manual_o1 = manual_ox = manual_o2 = None
-    with st.expander("🖊️ Manuel Oran Giriş (Opsiyonel)", expanded=False):
-        st.caption("Otomatik çekilemeyen ligler için")
-        manual_o1 = st.number_input("1 (Ev)", min_value=1.01, max_value=30.0, value=2.0, step=0.01, format="%.2f")
-        manual_ox = st.number_input("X", min_value=1.01, max_value=30.0, value=3.20, step=0.01, format="%.2f")
-        manual_o2 = st.number_input("2 (Dep)", min_value=1.01, max_value=30.0, value=3.80, step=0.01, format="%.2f")
-        use_manual_odds = st.checkbox("Manuel oranları kullan", value=False)
-    run_pattern = False  # artık otomatik çalışıyor
+    odds_api_key = ""
+    with st.expander("🖊️ Manuel Oran Giriş", expanded=False):
+        st.caption("Oran otomatik çekilemezse buraya gir")
+        manual_o1 = st.number_input("1 (Ev Kazanır)", min_value=1.01, max_value=30.0, value=2.0, step=0.01, format="%.2f")
+        manual_ox = st.number_input("X (Beraberlik)", min_value=1.01, max_value=30.0, value=3.20, step=0.01, format="%.2f")
+        manual_o2 = st.number_input("2 (Dep Kazanır)", min_value=1.01, max_value=30.0, value=3.80, step=0.01, format="%.2f")
+        use_manual_odds = st.checkbox("Bu oranları kullan", value=False)
 
 # ══════════════════════════════════════════════════════════════════
 # API
@@ -585,53 +584,132 @@ def compute_stats(ms_mat, ht_mat):
 
 FDCOUK_FIXTURE_URL = "https://www.football-data.co.uk/fixtures.csv"
 
-# Lig kodu eşleştirme: football-data.org kodu → football-data.co.uk kodu
+# Lig kodu: football-data.org → football-data.co.uk
 FD_ORG_TO_COUK = {
-    "PL":  "E0", "ELC": "E1",
-    "PD":  "SP1","BL1": "D1",
-    "SA":  "I1", "FL1": "F1",
-    "DED": "N1", "PPL": "P1",
+    "PL":"E0","ELC":"E1","PD":"SP1","BL1":"D1",
+    "SA":"I1","FL1":"F1","DED":"N1","PPL":"P1",
 }
+
+# Lig kodu: football-data.org → The Odds API sport key
+FD_ORG_TO_ODDSAPI = {
+    "PL":  "soccer_epl",
+    "ELC": "soccer_efl_champ",
+    "PD":  "soccer_spain_la_liga",
+    "BL1": "soccer_germany_bundesliga",
+    "SA":  "soccer_italy_serie_a",
+    "FL1": "soccer_france_ligue_one",
+    "DED": "soccer_netherlands_eredivisie",
+    "PPL": "soccer_portugal_primeira_liga",
+    "CL":  "soccer_uefa_champs_league",
+    "EL":  "soccer_uefa_europa_league",
+    "ECL": "soccer_uefa_europa_conference_league",
+    "BSA": "soccer_brazil_campeonato",
+}
+
+ODDS_API_KEY = ""  # Sidebar'dan alınır
 
 SEASON_CODES = ["2526","2425","2324","2223","2122","2021"]
 
-@st.cache_data(ttl=3600, show_spinner=False)
+@st.cache_data(ttl=1800, show_spinner=False)
 def fetch_fixtures_with_odds(couk_code):
     """
-    football-data.co.uk fixtures.csv'den belirli ligin açık maçlarını ve oranlarını çek.
-    Döndürür: {HomeTeam_AwayTeam: {B365H, B365D, B365A, AvgH, AvgD, AvgA, ...}}
+    football-data.co.uk'tan oranları çek — KEY YOK, KAYIT YOK.
+    Strateji:
+      1. fixtures.csv → bu hafta + gelecek hafta açık maçlar
+      2. 2526/COUK.csv  → güncel sezon, oynanmamış satırlar (FTHG boş)
+      3. 2425/COUK.csv  → geçen sezon fallback
+    Her kaynakta oran sütunları: AvgH/D/A > B365H/D/A > PSH/D/A
     """
-    try:
-        import io, csv
-        r = requests.get(FDCOUK_FIXTURE_URL, timeout=15)
-        if r.status_code != 200:
-            return {}
-        try:    text = r.content.decode("utf-8")
-        except: text = r.content.decode("latin-1")
-        rows = list(csv.DictReader(io.StringIO(text)))
-        result = {}
+    import io, csv as _csv
+
+    def fetch_text(url):
+        try:
+            r = requests.get(url, timeout=15)
+            if r.status_code != 200:
+                return []
+            try:    txt = r.content.decode("utf-8")
+            except: txt = r.content.decode("latin-1")
+            rows = list(_csv.DictReader(io.StringIO(txt)))
+            return [row for row in rows if any(v.strip() for v in row.values())]
+        except:
+            return []
+
+    def extract_odds(rows, require_div=None):
+        """Satırlardan oran dict'i çıkar. FTHG boşsa oynanmamış demektir."""
+        out = {}
         for row in rows:
-            if row.get("Div","").strip() != couk_code:
+            if require_div and row.get("Div","").strip() != require_div:
                 continue
             home = row.get("HomeTeam","").strip()
             away = row.get("AwayTeam","").strip()
             if not home or not away:
                 continue
-            o1 = _safe_float(row.get("AvgH") or row.get("B365H"))
-            ox = _safe_float(row.get("AvgD") or row.get("B365D"))
-            o2 = _safe_float(row.get("AvgA") or row.get("B365A"))
-            o25_ov = _safe_float(row.get("Avg>2.5") or row.get("B365>2.5"))
-            o25_un = _safe_float(row.get("Avg<2.5") or row.get("B365<2.5"))
-            if o1 and ox and o2:
-                result[f"{home}|||{away}"] = {
-                    "home": home, "away": away,
-                    "o1": o1, "ox": ox, "o2": o2,
-                    "o25_ov": o25_ov, "o25_un": o25_un,
-                    "source": "football-data.co.uk"
-                }
+            # Oynanmış maçları geç (FTHG dolu)
+            fthg = row.get("FTHG","").strip()
+            if fthg not in ("","?","-"):
+                continue
+            # Oran kaynağı önceliği: Avg > B365 > PS > IW > VC
+            def pick(*keys):
+                for k in keys:
+                    v = _safe_float(row.get(k,""))
+                    if v and v > 1.0: return v
+                return None
+            o1  = pick("AvgH","B365H","PSH","IWH","VCH","WHH")
+            ox  = pick("AvgD","B365D","PSD","IWD","VCD","WHD")
+            o2  = pick("AvgA","B365A","PSA","IWA","VCA","WHA")
+            if not (o1 and ox and o2):
+                continue
+            o25 = pick("Avg>2.5","B365>2.5","P>2.5")
+            u25 = pick("Avg<2.5","B365<2.5","P<2.5")
+            out[f"{home}|||{away}"] = {
+                "home":home,"away":away,
+                "o1":o1,"ox":ox,"o2":o2,
+                "o25_ov":o25,"o25_un":u25,
+                "source":"football-data.co.uk"
+            }
+        return out
+
+    # 1. Global fixtures.csv
+    rows = fetch_text(FDCOUK_FIXTURE_URL)
+    result = extract_odds(rows, require_div=couk_code)
+    if result:
         return result
-    except Exception as e:
-        return {}
+
+    # 2. Güncel sezon CSV
+    for season in ["2526","2425"]:
+        url = f"https://www.football-data.co.uk/mmz4281/{season}/{couk_code}.csv"
+        rows = fetch_text(url)
+        if rows:
+            r2 = extract_odds(rows)
+            if r2:
+                return r2
+
+    return {}
+
+def get_match_odds(sel_code, odds_api_key, hn, an, auto_odds):
+    """
+    football-data.co.uk'tan otomatik oran çek — KEY YOK.
+    Cache: 30dk (maçlar çekildikten sonra değişmez).
+    """
+    if not auto_odds:
+        return None
+    couk_code = FD_ORG_TO_COUK.get(sel_code)
+    if not couk_code:
+        return None  # Bu lig fdcouk'ta yok (CL, BSA vb.)
+
+    fo_key = f"fdcouk_{couk_code}"
+    if fo_key not in st.session_state:
+        fo = fetch_fixtures_with_odds(couk_code)
+        st.session_state[fo_key] = fo
+    else:
+        fo = st.session_state[fo_key]
+
+    if debug:
+        st.caption(f"🐛 fdcouk [{couk_code}] {len(fo)} maç | Aranan: {hn} vs {an}")
+        for k in list(fo.keys())[:4]:
+            st.caption(f"🐛  {k.replace('|||',' vs ')}")
+
+    return match_odds_to_fixture(fo, hn, an)
 
 @st.cache_data(ttl=86400, show_spinner=False)
 def fetch_season_csv(couk_code, season_code):
@@ -664,14 +742,35 @@ def fuzzy_match_team(name1, name2):
     """İki takım adını normalize edip benzerlik kontrol et."""
     def norm(s):
         s = s.lower().strip()
-        for rep in [" fc","fc ","afc ","" ," utd","united","city","town"," cf"," sc"]:
-            s = s.replace(rep,"")
+        # Yaygın kısaltmaları normalize et
+        replacements = [
+            (" fc",""),("fc ",""),(" afc",""),("afc ",""),(" utd",""),
+            (" united",""),(" city",""),(" town",""),(" cf",""),(" sc",""),
+            (" & hove albion",""),(" albion",""),(" athletic",""),
+            (" wanderers",""),(" rovers",""),(" hotspur",""),
+            ("manchester ","man "),("tottenham","spurs"),
+            ("wolverhampton","wolves"),("leicester","leicester"),
+            ("nottingham","nott'm"),("nott'm","notm"),
+            ("paris saint-germain","psg"),("paris sg","psg"),
+            ("inter milan","inter"),("ac milan","milan"),
+            ("atletico","atl"),("real madrid","real"),
+            ("bayer leverkusen","leverkusen"),
+        ]
+        for old, new in replacements:
+            s = s.replace(old, new)
         return s.strip()
+
     n1, n2 = norm(name1), norm(name2)
     if n1 == n2: return True
-    if n1 in n2 or n2 in n1: return True
-    # 3 harf ön eşleşme
-    if len(n1)>=3 and len(n2)>=3 and n1[:3]==n2[:3]: return True
+    if len(n1) >= 4 and n1 in n2: return True
+    if len(n2) >= 4 and n2 in n1: return True
+    # 4 harf ön eşleşme
+    if len(n1) >= 4 and len(n2) >= 4 and n1[:4] == n2[:4]: return True
+    # Kelime bazlı eşleşme — ortak kelime varsa
+    w1 = set(n1.split())
+    w2 = set(n2.split())
+    common = w1 & w2
+    if common and max(len(w) for w in common) >= 4: return True
     return False
 
 def match_odds_to_fixture(fixtures_odds, h_name, a_name):
@@ -2113,29 +2212,23 @@ if fetch_btn:
         # prompt aşağıda odds ile birlikte oluşturuluyor
         # ── Otomatik oran çekme ──────────────────────────────
         oa = None
-        couk_code = FD_ORG_TO_COUK.get(sel_code)
+        # ── Otomatik oran çekme (The Odds API → fdcouk fallback) ──
+        matched_odds = None
+        if auto_odds:
+            matched_odds = get_match_odds(sel_code, odds_api_key, hn, an, auto_odds)
 
-        if couk_code and auto_odds:
-            # fixtures.csv'den bu ligin açık maçlarının oranlarını çek
-            if "fixtures_odds_cache" not in st.session_state:
-                st.session_state["fixtures_odds_cache"] = {}
-            if couk_code not in st.session_state["fixtures_odds_cache"]:
-                fo = fetch_fixtures_with_odds(couk_code)
-                st.session_state["fixtures_odds_cache"][couk_code] = fo
-            fixtures_odds = st.session_state["fixtures_odds_cache"].get(couk_code, {})
-
-            matched_odds = match_odds_to_fixture(fixtures_odds, hn, an)
-            if matched_odds:
-                oa = analyze_odds(
-                    matched_odds["o1"], matched_odds["ox"], matched_odds["o2"],
-                    stats, hn, an
-                )
-                # over/under ekle
-                if matched_odds.get("o25_ov"):
-                    oa["o25_ov"] = matched_odds["o25_ov"]
-                    oa["o25_un"] = matched_odds.get("o25_un")
+        if matched_odds:
+            oa = analyze_odds(
+                matched_odds["o1"], matched_odds["ox"], matched_odds["o2"],
+                stats, hn, an
+            )
+            if matched_odds.get("o25_ov"):
+                oa["o25_ov"] = matched_odds["o25_ov"]
+                oa["o25_un"] = matched_odds.get("o25_un")
+            oa["_source"] = matched_odds.get("source","?")
         elif use_manual_odds and manual_o1:
             oa = analyze_odds(manual_o1, manual_ox, manual_o2, stats, hn, an)
+            oa["_source"] = "manuel"
 
         # ── Pattern arama (otomatik) ─────────────────────────
         pattern_data = None
@@ -2192,7 +2285,9 @@ if st.session_state.matches:
         _odds_chip = ""
         _d_oa = st.session_state.mdata.get(mid,{}).get("odds_analysis")
         if _d_oa:
-            _odds_chip = f" · 1:{_d_oa['o1']} X:{_d_oa['ox']} 2:{_d_oa['o2']}"
+            _src = _d_oa.get("_source","")
+            _src_icon = "🟢" if "odds-api" in _src else "🟡" if "football-data" in _src else "🔵" if _src=="manuel" else ""
+            _odds_chip = f" · {_src_icon} 1:{_d_oa['o1']} X:{_d_oa['ox']} 2:{_d_oa['o2']}"
         with st.expander(f"{'✅' if done else '🔴'}  {hn}  vs  {an}  ·  {utc[11:16]}{_odds_chip}"):
             if d:
                 hxg = d.get("hxg",0); axg = d.get("axg",0)
