@@ -3314,6 +3314,44 @@ def auto_best_bet(lp, h_name, a_name, h_score, a_score, hf=None, af=None, league
     return meaningful[0]
 
 
+def _get_all_bets(lp, h_name, a_name, h_score, a_score, hf=None, af=None, league_code=None):
+    """Tüm anlamlı pazarları olasılığa göre sıralı döndür. %95+ve%50- hariç."""
+    is_ht  = lp.get("is_first_half", False)
+    ht_rem = lp.get("ht_remaining_min", 0)
+
+    cands = []
+    def add(mkt, prob, why, pri):
+        p = float(prob or 0)
+        if 52 <= p <= 93:
+            cands.append({"market": mkt, "prob": p, "why": why, "priority": pri})
+
+    add(f"{h_name} Gol Atar (0.5Ü)",  lp.get("p_next_h",0),   f"%{lp.get('p_next_h',0):.0f} ev atar", 1)
+    add(f"{a_name} Gol Atar (0.5Ü)",  lp.get("p_next_a",0),   f"%{lp.get('p_next_a',0):.0f} dep atar", 2)
+    add("MS 1.5 Üst",  lp.get("o15",0),         f"2+ gol", 4)
+    add("MS 1.5 Alt",  lp.get("u15",0),         f"1 ya da 0 gol", 14)
+    add("MS 2.5 Üst",  lp.get("o25",0),         f"3+ gol", 6)
+    add("MS 2.5 Alt",  lp.get("u25",0),         f"2 ya da az gol", 8)
+    add("MS 3.5 Üst",  lp.get("o35",0),         f"4+ gol", 9)
+    add("MS 3.5 Alt",  lp.get("u35",0),         f"3 ya da az gol", 10)
+    add("KG VAR",      lp.get("p_kg_var",0),    f"her iki takım atar", 11)
+    add("MS 0.5 Üst",  lp.get("p_next_goal",0), f"maçta gol olur", 5)
+    if is_ht and ht_rem >= 4:
+        add("İY 0.5 Üst", lp.get("ht_o5",0),    f"İY gol gelir {ht_rem}dk kaldı", 3)
+        add("İY 0.5 Alt", lp.get("ht_u5",0),     f"İY gol gelmez", 12)
+        add("İY KG VAR",  lp.get("ht_kg_var",0), f"İY her iki takım atar", 13)
+    if is_ht and ht_rem >= 7:
+        add("İY 1.5 Üst", lp.get("ht_o15",0),   f"İY 2+ gol", 7)
+        add("İY 1.5 Alt", lp.get("ht_u15",0),   f"İY 1 ya da 0 gol", 15)
+
+    cands.sort(key=lambda x: (-x["prob"], x["priority"]))
+    seen, result = set(), []
+    for c in cands:
+        if c["market"] not in seen:
+            seen.add(c["market"])
+            result.append(c)
+    return result[:6]
+
+
 
 
 # ── VS UI ── (mevcut render_vs_ui burada)
