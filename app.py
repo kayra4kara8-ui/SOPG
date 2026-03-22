@@ -10,6 +10,7 @@ st.set_page_config(page_title="⚽ BetAnalyst Pro", page_icon="⚽",
 FD_KEY          = "5cc88bf0dbac4fb699482886eb4c2270"
 AF_KEY_DEFAULT  = "b30caea6f2a4c305ff317308de0b917d"
 GROQ_KEY = "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"
+ODDS_API_KEY_DEFAULT = "4d4d08c88873623761e05df66d0aeb07"
 
 # ══════════════════════════════════════════════════════════════════
 # CSS
@@ -473,22 +474,13 @@ with st.sidebar:
     st.divider()
     st.markdown("### 💰 Oran Kaynakları")
 
-    # ── The Odds API (önerilen, ücretsiz 500 istek/ay) ──
+    # ── The Odds API — key hardcoded ──
     st.markdown("""<div style="background:#0d1829;border:1px solid #1c2e44;border-left:3px solid #00e5a0;
-border-radius:6px;padding:8px 10px;font-size:.73rem;color:#7a9ab8;line-height:1.9;margin-bottom:6px">
-<b style="color:#00e5a0">⭐ The Odds API — ÖNERİLEN</b><br>
-→ <a href="https://the-odds-api.com" target="_blank" style="color:#4c9eff">the-odds-api.com</a> · ücretsiz kayıt<br>
-→ <b style="color:#d0dce8">500 istek/ay ücretsiz · Kart yok</b><br>
-→ Bet365, Pinnacle, Unibet gerçek oranları<br>
-→ Premier League, La Liga, Bundesliga vb.
+border-radius:6px;padding:8px 10px;font-size:.73rem;color:#7a9ab8;line-height:1.4;margin-bottom:6px">
+<b style="color:#00e5a0">✅ The Odds API — AKTİF</b><br>
+<span style="color:#3ecf7a">Bet365 · Pinnacle · Unibet gerçek oranları</span>
 </div>""", unsafe_allow_html=True)
-    odds_api_key = st.text_input(
-        "The Odds API Key",
-        value="",
-        type="password",
-        placeholder="the-odds-api.com → API Key",
-        help="https://the-odds-api.com — ücretsiz 500 istek/ay"
-    )
+    odds_api_key = ODDS_API_KEY_DEFAULT
 
     # ── API-Football (yedek) ──
     with st.expander("⚙️ API-Football Key (yedek)", expanded=False):
@@ -1089,7 +1081,7 @@ FD_ORG_TO_ODDSAPI = {
     "BSA": "soccer_brazil_campeonato",
 }
 
-ODDS_API_KEY = ""  # Sidebar'dan alınır
+ODDS_API_KEY = ODDS_API_KEY_DEFAULT
 
 SEASON_CODES = ["2526","2425","2324","2223","2122","2021"]
 
