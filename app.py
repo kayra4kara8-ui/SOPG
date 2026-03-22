@@ -2,6 +2,15 @@ import streamlit as st
 import requests
 import math
 import time
+def _safe_minute(val, default=45):
+    """Parse a match minute safely — handles '?', '', None, '45+2', etc."""
+    try:
+        s = str(val).replace("'","").replace("+","").strip()
+        return int(s.split()[0]) if s and s[0].isdigit() else default
+    except:
+        return default
+
+
 from datetime import date
 
 st.set_page_config(page_title="⚽ BetAnalyst Pro", page_icon="⚽",
@@ -2838,7 +2847,7 @@ def render_live_match(m, live_stats, lp, analysis_text, hf, af, h2h):
     ht_h   = m.get("score",{}).get("halfTime",{}).get("home") or 0
     ht_a   = m.get("score",{}).get("halfTime",{}).get("away") or 0
     minute = m.get("minute", m.get("currentPeriodStartTime", 0)) or "?"
-    is_ht  = lp.get("is_first_half", int(str(minute).replace("'","") or 45) <= 45)
+    is_ht  = lp.get("is_first_half", _safe_minute(minute) <= 45)
     ht_rem = lp.get("ht_remaining_min", 0)
     ms_rem = lp.get("remaining_min", 0)
     fv     = lambda d,k,dv=0: d.get(k,dv) if d else dv
@@ -3912,7 +3921,7 @@ if app_mode == "🔴 Canlı Maçlar":
             ht_h = lm.get("score",{}).get("halfTime",{}).get("home") or 0
             ht_a = lm.get("score",{}).get("halfTime",{}).get("away") or 0
             try:
-                minute_int = int(str(lm.get("minute","45")).replace("'","").strip())
+                minute_int = _safe_minute(lm.get("minute", 45))
             except:
                 minute_int = 45
             bar.progress((idx) / total, text=f"({idx+1}/{total}) {lhn} – {lan}")
@@ -4012,7 +4021,7 @@ display:flex;align-items:center;gap:14px">
                 live_stats    = parse_live_stats(ss_raw)
 
                 try:
-                    minute_int = int(str(lmin).replace("'","").strip())
+                    minute_int = _safe_minute(lmin)
                 except:
                     minute_int = 45
 
