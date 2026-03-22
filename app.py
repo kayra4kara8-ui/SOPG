@@ -549,14 +549,45 @@ def api_scorers(code):
 
 def api_live_matches(code=None):
     """
-    Şu an oynanan canlı maçları çek.
-    football-data.org /v4/matches?status=IN_PLAY,PAUSED
+    Şu an oynanan canlı maçları çek — sıkı filtreleme ile.
+    Sadece status IN_PLAY veya PAUSED (devre arası) olanlar.
+    FINISHED, SUSPENDED, POSTPONED olanlar kesinlikle dışlanır.
     """
+    import datetime as _dt
+
+    LIVE_STATUSES = {"IN_PLAY", "PAUSED"}  # sadece bunlar canlı
+
     params = {"status": "IN_PLAY,PAUSED"}
     if code:
-        return fd_get(f"/competitions/{code}/matches", params).get("matches", [])
+        raw = fd_get(f"/competitions/{code}/matches", params).get("matches", [])
     else:
-        return fd_get("/matches", params).get("matches", [])
+        raw = fd_get("/matches", params).get("matches", [])
+
+    now_utc = _dt.datetime.utcnow()
+    live = []
+    for m in raw:
+        # 1. Status kontrolü — FINISHED olanları kesinlikle at
+        status = m.get("status", "")
+        if status not in LIVE_STATUSES:
+            continue
+
+        # 2. UTC saat kontrolü — bugün oynanıyor olmalı
+        utc_str = m.get("utcDate", "")
+        if utc_str:
+            try:
+                match_dt = _dt.datetime.strptime(utc_str[:16], "%Y-%m-%dT%H:%M")
+                # Maç saatinden 3 saat sonrasına kadar "canlı olabilir" kabul et
+                # (90 dakika + stopaj + olası uzatma)
+                if match_dt > now_utc:
+                    continue  # Henüz başlamamış
+                if (now_utc - match_dt).total_seconds() > 3 * 3600:
+                    continue  # 3 saatten eski → bitmiş demektir
+            except:
+                pass
+
+        live.append(m)
+
+    return live
 
 def api_live_match_detail(match_id):
     """Tek maçın detayını çek (skor, dakika, istatistik)."""
@@ -3570,12 +3601,24 @@ if app_mode == "🔴 Canlı Maçlar":
         with st.spinner("📡 Canlı maçlar çekiliyor..."):
             live_ms = api_live_matches(code_filter)
 
+        # Eski/bitmiş maçları session_state'ten temizle
+        # Şu an gelen live_ms'deki ID'ler dışındakileri sil
+        current_live_ids = {lm["id"] for lm in live_ms}
+        stale_ids = [k for k in st.session_state["live_matches"]
+                     if k not in current_live_ids]
+        for sid in stale_ids:
+            st.session_state["live_matches"].pop(sid, None)
+            st.session_state["live_analyses"].pop(sid, None)
+
         if not live_ms:
             st.info("🔴 Şu anda oynanan maç bulunamadı. Ligler aktif değil veya API limiti dolmuş olabilir.")
         else:
             st.success(f"✅ {len(live_ms)} canlı maç bulundu")
-            # Her maç için temel veri çek
             for lm in live_ms:
+                # Son bir kez status kontrolü — FINISHED gelmiş olabilir
+                if lm.get("status","") not in ("IN_PLAY","PAUSED"):
+                    continue
+
                 lid  = lm["id"]
                 lhn  = lm["homeTeam"]["name"]
                 lan  = lm["awayTeam"]["name"]
