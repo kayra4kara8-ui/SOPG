@@ -3,12 +3,75 @@ import requests
 import math
 import time
 def _safe_minute(val, default=45):
-    """Parse a match minute safely — handles '?', '', None, '45+2', etc."""
+    """Parse a match minute safely — handles ?, empty, None, 45+2, etc."""
     try:
-        s = str(val).replace("'","").replace("+","").strip()
-        return int(s.split()[0]) if s and s[0].isdigit() else default
+        s = str(val).replace("'","").strip()
+        # "45+2" → 47, "90+4" → 94
+        if "+" in s:
+            parts = s.split("+")
+            return int(parts[0]) + int(parts[1])
+        s = s.split()[0]
+        return int(s) if s and s[0].isdigit() else default
     except:
         return default
+
+def calc_live_minute(m):
+    """
+    football-data.org /v4/matches nesnesinden gerçek oyun dakikasını hesapla.
+
+    football-data.org minute alanı VERMEZ.
+    Bunun yerine:
+      - status IN_PLAY / PAUSED
+      - lastUpdated  → maçın en son güncellendiği zaman (UTC ISO string)
+      - utcDate      → maç başlangıç zamanı
+
+    1. PAUSED (devre arası) → 45 göster
+    2. IN_PLAY:
+       a. lastUpdated varsa: şimdiki UTC - maç başlangıcı = geçen süre
+          45'ten fazlaysa → 45+geçen-45 (2Y hesabı)
+       b. utcDate'den basit hesap
+    3. Sonucu 1-90 arasında sınırla
+    """
+    import datetime as _dt
+
+    status = m.get("status", "")
+    if status == "PAUSED":
+        return 45
+
+    utc_str  = m.get("utcDate", "")
+    last_str = m.get("lastUpdated", "")
+
+    now = _dt.datetime.utcnow()
+
+    # Maç başlangıcını parse et
+    start = None
+    for s in [utc_str, last_str]:
+        if not s:
+            continue
+        try:
+            start = _dt.datetime.strptime(s[:19].replace("T"," "), "%Y-%m-%d %H:%M:%S")
+            break
+        except:
+            pass
+
+    if start is None:
+        return 45  # bilinmiyor
+
+    # Geçen süreyi hesapla
+    elapsed_seconds = max(0, (now - start).total_seconds())
+    elapsed_minutes = int(elapsed_seconds / 60)
+
+    # Devre arası ~15dk → 2Y başlangıcı 60dk'dan itibaren say
+    if elapsed_minutes <= 45:
+        minute = elapsed_minutes
+    elif elapsed_minutes <= 60:
+        minute = 45  # devre arası veya henüz 2Y başlamadı
+    else:
+        # 2Y: geçen süreden devre arasını (15dk) çıkar
+        minute = elapsed_minutes - 15
+
+    # Stopaj süresini hesaba kat (maksimum 95)
+    return max(1, min(95, minute))
 
 
 from datetime import date
@@ -2846,7 +2909,7 @@ def render_live_match(m, live_stats, lp, analysis_text, hf, af, h2h):
     a_sc   = m.get("score",{}).get("fullTime",{}).get("away") or 0
     ht_h   = m.get("score",{}).get("halfTime",{}).get("home") or 0
     ht_a   = m.get("score",{}).get("halfTime",{}).get("away") or 0
-    minute = m.get("minute", m.get("currentPeriodStartTime", 0)) or "?"
+    minute = calc_live_minute(m)
     is_ht  = lp.get("is_first_half", _safe_minute(minute) <= 45)
     ht_rem = lp.get("ht_remaining_min", 0)
     ms_rem = lp.get("remaining_min", 0)
@@ -3921,7 +3984,7 @@ if app_mode == "🔴 Canlı Maçlar":
             ht_h = lm.get("score",{}).get("halfTime",{}).get("home") or 0
             ht_a = lm.get("score",{}).get("halfTime",{}).get("away") or 0
             try:
-                minute_int = _safe_minute(lm.get("minute", 45))
+                minute_int = calc_live_minute(lm)
             except:
                 minute_int = 45
             bar.progress((idx) / total, text=f"({idx+1}/{total}) {lhn} – {lan}")
@@ -3975,7 +4038,7 @@ padding:2rem;text-align:center;color:#4a6880;font-size:.82rem">
                 top_pick = {
                     "match": f"{lm['homeTeam']['name']} vs {lm['awayTeam']['name']}",
                     "score": f"{lm.get('score',{}).get('fullTime',{}).get('home') or 0}–{lm.get('score',{}).get('fullTime',{}).get('away') or 0}",
-                    "minute": lm.get("minute","?"),
+                    "minute": calc_live_minute(lm),
                     **pick
                 }
                 break
@@ -4005,7 +4068,7 @@ display:flex;align-items:center;gap:14px">
             lan  = lm["awayTeam"]["name"]
             lhsc = lm.get("score",{}).get("fullTime",{}).get("home") or 0
             lasc = lm.get("score",{}).get("fullTime",{}).get("away") or 0
-            lmin = lm.get("minute","?")
+            lmin = calc_live_minute(lm)
             done = lid in st.session_state["live_analyses"]
             cscore = _confidence_score(st.session_state["live_analyses"].get(lid,""))
 
