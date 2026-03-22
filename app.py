@@ -971,7 +971,7 @@ def calc_live_goal_probability(live_stats, minute, h_score, a_score, hf, af, lea
 
     # ── Momentum ──────────────────────────────────────────────────
     total_attacks = dan_h + dan_a + shots_h + shots_a
-    momentum_h = round((dan_h + shots_on_h * 1.5) / max(1, dan_h + dan_a + shots_on_h + shots_on_a) * 100) if total_attacks > 0 else 50
+    momentum_h = max(0, min(100, round((dan_h + shots_on_h * 1.5) / max(1, dan_h + dan_a + shots_on_h + shots_on_a) * 100))) if total_attacks > 0 else 50
 
     return {
         "elapsed":            elapsed,
@@ -1056,10 +1056,10 @@ TARİHSEL FORM:
     iy_section = f"""
 ### 2. İLK YARI GOL ANALİZİ
 {f"İY {ht_rem} dakika kaldı — mevcut: {h_score}-{a_score}" if is_ht and ht_rem > 0 else "İLK YARI TAMAMLANDI — İY skoru: " + str(ht_h) + "-" + str(ht_a)}
-{"[Kalan İY süresinde gol olup olmayacağını analiz et: xG hızı, şut baskısı, atak yoğunluğu ve tarihsel İY ortalamasını kullanarak İY 0.5 Üst/Alt + KG VAR/YOK için veri bazlı yorum yap]" if is_ht and ht_rem > 0 else "[İY sonucu ve 2. yarıya nasıl etki eder yorumla — skorun 2Y gol beklentisine etkisi]"}
+{"[Yukarıdaki İY olasılık sayılarını kullan. Kalan süre EXACTLY " + str(ht_rem) + " dakika. Skor " + str(h_score) + "-" + str(a_score) + ". Bu sayıları değiştirme. İY 0.5 Üst/Alt için net karar ver.]" if is_ht and ht_rem > 0 else "[İY skoru " + str(ht_h) + "-" + str(ht_a) + ". 2. yarıda gol beklentisini değerlendir.]"}
 
 İY BAHİS TAVSİYESİ:
-{"IY_BAHSI_1: [pazar adı] — [gerekçe] — GÜVENİLİRLİK: [YÜKSEK/ORTA/DÜŞÜK]" if is_ht and ht_rem > 0 else "IY_BAHSI_1: İY tamamlandı — 2Y analizine odaklan"}
+{("IY_BAHSI_1: [pazar adı — ör: İY 0.5 Alt veya İY 1.5 Alt veya İY KG YOK — ZATEN OLAN PAZARLARI ÖNERME] — [gerekçe] — GÜVENİLİRLİK: [YÜKSEK/ORTA/DÜŞÜK]" if is_ht and ht_rem > 0 else "IY_BAHSI_1: İY tamamlandı")}
 {"IY_BAHSI_2: [pazar adı] — [gerekçe] — GÜVENİLİRLİK: [YÜKSEK/ORTA/DÜŞÜK]" if is_ht and ht_rem > 0 else ""}""" if is_ht else f"""
 ### 2. İLK YARI SONUCU
 İY skoru: {ht_h}-{ht_a} (EV {ht_h}, DEP {ht_a})
@@ -1067,9 +1067,12 @@ TARİHSEL FORM:
 
     return f"""Sen bir profesyonel canlı bahis analistisin. Türkçe yaz. Her cümle bu maça özgü olmalı — jenerik yorum yasak.
 
-ÖNEMLİ KURAL: "Bekle" veya "Şartlar oluşmadı" gibi genel geçer yanıtlar YASAK.
-Her pazar için kesin karar ver — ya AL ya GEÇME, gerekçesiyle birlikte.
-Veri yetersizse de o veriden çıkarım yap.
+KRİTİK KURALLAR:
+1. Sadece KALAN SÜREYE uygun pazar öner — maç biterken "2.5 Üst" önermek anlamsız.
+2. Zaten gerçekleşmiş pazarları ÖNERME — skor 1-1 iken "MS 1.5 Üst" işe yaramaz.
+3. TUTARLI OL — aynı maça hem "2.5 Üst" hem "2.5 Alt" önerme, hangisi daha güçlüyse onu seç.
+4. Kalan süre {ms_rem}dk, skor {h_score}-{a_score} — buna göre hangi pazarın değeri var düşün.
+5. Oran 1.05 olan pazar önerme — %95+ olasılıklı pazarların oran değeri yok.
 
 MAÇ: {h} (EV) vs {a} (DEP) — Dakika: {minute}'
 {stat_block}
@@ -3325,23 +3328,25 @@ def _get_all_bets(lp, h_name, a_name, h_score, a_score, hf=None, af=None, league
         if 52 <= p <= 93:
             cands.append({"market": mkt, "prob": p, "why": why, "priority": pri})
 
-    add(f"{h_name} Gol Atar (0.5Ü)",  lp.get("p_next_h",0),   f"%{lp.get('p_next_h',0):.0f} ev atar", 1)
-    add(f"{a_name} Gol Atar (0.5Ü)",  lp.get("p_next_a",0),   f"%{lp.get('p_next_a',0):.0f} dep atar", 2)
-    add("MS 1.5 Üst",  lp.get("o15",0),         f"2+ gol", 4)
-    add("MS 1.5 Alt",  lp.get("u15",0),         f"1 ya da 0 gol", 14)
-    add("MS 2.5 Üst",  lp.get("o25",0),         f"3+ gol", 6)
-    add("MS 2.5 Alt",  lp.get("u25",0),         f"2 ya da az gol", 8)
-    add("MS 3.5 Üst",  lp.get("o35",0),         f"4+ gol", 9)
-    add("MS 3.5 Alt",  lp.get("u35",0),         f"3 ya da az gol", 10)
-    add("KG VAR",      lp.get("p_kg_var",0),    f"her iki takım atar", 11)
-    add("MS 0.5 Üst",  lp.get("p_next_goal",0), f"maçta gol olur", 5)
+    add(f"{h_name} Gol Atar", lp.get("p_next_h",0),   f"ev baskısı", 1)
+    add(f"{a_name} Gol Atar", lp.get("p_next_a",0),   f"dep atağı", 2)
+    # MS üst/alt — skip_if_done: eşik zaten geçildiyse önerme
+    add("MS 1.5 Üst",  lp.get("o15",0),  "2+ gol",       4,  skip_if_done=0)   # 1 gol varsa "1.5 üst" done
+    add("MS 1.5 Alt",  lp.get("u15",0),  "max 1 gol",    14, skip_if_done=None)
+    add("MS 2.5 Üst",  lp.get("o25",0),  "3+ gol",       6,  skip_if_done=1)   # 2 gol varsa done
+    add("MS 2.5 Alt",  lp.get("u25",0),  "max 2 gol",    8,  skip_if_done=None)
+    add("MS 3.5 Üst",  lp.get("o35",0),  "4+ gol",       9,  skip_if_done=2)
+    add("MS 3.5 Alt",  lp.get("u35",0),  "max 3 gol",    10, skip_if_done=None)
+    add("KG VAR",      lp.get("p_kg_var",0), "her iki takım atar", 11)
+    if total_g == 0:
+        add("İlk Gol Var", lp.get("p_next_goal",0), "maçta gol olur", 5)
     if is_ht and ht_rem >= 4:
-        add("İY 0.5 Üst", lp.get("ht_o5",0),    f"İY gol gelir {ht_rem}dk kaldı", 3)
-        add("İY 0.5 Alt", lp.get("ht_u5",0),     f"İY gol gelmez", 12)
-        add("İY KG VAR",  lp.get("ht_kg_var",0), f"İY her iki takım atar", 13)
+        add("İY 0.5 Üst", lp.get("ht_o5",0),  f"İY gol gelir {ht_rem}dk", 3, skip_if_done=0)
+        add("İY 0.5 Alt", lp.get("ht_u5",0),  f"İY gol gelmez",          12)
+        add("İY KG VAR",  lp.get("ht_kg_var",0), "İY her iki takım atar", 13)
     if is_ht and ht_rem >= 7:
-        add("İY 1.5 Üst", lp.get("ht_o15",0),   f"İY 2+ gol", 7)
-        add("İY 1.5 Alt", lp.get("ht_u15",0),   f"İY 1 ya da 0 gol", 15)
+        add("İY 1.5 Üst", lp.get("ht_o15",0), f"İY 2+ gol", 7, skip_if_done=0)
+        add("İY 1.5 Alt", lp.get("ht_u15",0), f"İY max 1 gol", 15)
 
     cands.sort(key=lambda x: (-x["prob"], x["priority"]))
     seen, result = set(), []
