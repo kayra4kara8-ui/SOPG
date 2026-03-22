@@ -1541,89 +1541,189 @@ def render_odds_panel(oa, h, a, model_stats):
 def build_prompt(h, a, hf, af, h2h, hxg, axg, h_htxg, a_htxg,
                  stats, h_stand, a_stand, h_sc, a_sc, top_ms, top_ht,
                  odds_analysis=None):
-    """Kısa ama yeterli prompt — token limitini aşmamak için kompakt."""
+    """Profesyonel, istatistik temelli, pattern odaklı betting analiz promptu."""
     fv = lambda d,k,dv=0: d.get(k,dv) if d else dv
     hs = h_stand or {}; as_ = a_stand or {}
 
-    # Maç karakteri (sadece önemli olanlar)
+    # Maç karakteri flagleri
     chars = []
     diff = round(hxg - axg, 2)
-    if diff > 0.6:    chars.append(f"EV FAVORİ xG+{diff}")
-    elif diff < -0.6: chars.append(f"DEP FAVORİ xG+{abs(diff)}")
+    if diff > 0.6:    chars.append(f"EV_FAVORİ xG+{diff}")
+    elif diff < -0.6: chars.append(f"DEP_FAVORİ xG+{abs(diff)}")
     else:             chars.append(f"DENGE xG={hxg}vs{axg}")
     hp=fv(hf,"pts5"); ap=fv(af,"pts5")
-    if hp>=12: chars.append(f"{h} SÜPER FORM {hp}/15")
-    elif hp<=4: chars.append(f"{h} KÖTÜ {hp}/15")
-    if ap>=12: chars.append(f"{a} SÜPER FORM {ap}/15")
-    elif ap<=4: chars.append(f"{a} KÖTÜ {ap}/15")
-    if fv(hf,"st_pct",55)>=62: chars.append(f"{h} 2Y_TAKIM(%{fv(hf,'st_pct',55)})")
-    if fv(af,"st_pct",55)>=62: chars.append(f"{a} 2Y_TAKIM(%{fv(af,'st_pct',55)})")
-    if h2h.get("rev21_pct",0)>=25: chars.append(f"H2H_2/1=%{h2h['rev21_pct']}")
-    if h2h.get("rev12_pct",0)>=25: chars.append(f"H2H_1/2=%{h2h['rev12_pct']}")
-    if fv(hf,"cs",0)>=3: chars.append(f"{h} SAĞLAM_SAVUNMA {fv(hf,'cs')}/{fv(hf,'n')}CS")
-    if fv(af,"avg_gc",0)>=2.0: chars.append(f"{a} SIFIR_SAVUNMA {fv(af,'avg_gc')}yenen")
-    if hs.get("position",10)>=16: chars.append(f"{h} DÜŞME_ZONu sıra:{hs.get('position')}")
-    if as_.get("position",10)>=16: chars.append(f"{a} DÜŞME_ZONu sıra:{as_.get('position')}")
+    if hp>=12: chars.append(f"{h}_SÜPER_FORM {hp}/15")
+    elif hp<=4: chars.append(f"{h}_KÖTÜ_FORM {hp}/15")
+    if ap>=12: chars.append(f"{a}_SÜPER_FORM {ap}/15")
+    elif ap<=4: chars.append(f"{a}_KÖTÜ_FORM {ap}/15")
+    if fv(hf,"st_pct",55)>=62: chars.append(f"{h}_2Y_AĞIR(%{fv(hf,'st_pct',55)})")
+    if fv(af,"st_pct",55)>=62: chars.append(f"{a}_2Y_AĞIR(%{fv(af,'st_pct',55)})")
+    if h2h.get("rev21_pct",0)>=25: chars.append(f"H2H_2/1_YÜKSEK=%{h2h['rev21_pct']}")
+    if h2h.get("rev12_pct",0)>=25: chars.append(f"H2H_1/2_YÜKSEK=%{h2h['rev12_pct']}")
+    if fv(hf,"cs",0)>=3: chars.append(f"{h}_SAĞLAM_DEF {fv(hf,'cs')}/{fv(hf,'n')}CS")
+    if fv(af,"avg_gc",0)>=2.0: chars.append(f"{a}_ZAYIF_DEF {fv(af,'avg_gc')}yenen")
+    if hs.get("position",10)>=16: chars.append(f"{h}_DÜŞME_ZONU sıra:{hs.get('position')}")
+    if as_.get("position",10)>=16: chars.append(f"{a}_DÜŞME_ZONU sıra:{as_.get('position')}")
 
-    h_sc_str = f"{h_sc.get('name','?')}({h_sc.get('goals',0)}g)" if h_sc else "?"
-    a_sc_str = f"{a_sc.get('name','?')}({a_sc.get('goals',0)}g)" if a_sc else "?"
+    h_sc_str = f"{h_sc.get('name','?')}({h_sc.get('goals',0)}g)" if h_sc else "Veri yok"
+    a_sc_str = f"{a_sc.get('name','?')}({a_sc.get('goals',0)}g)" if a_sc else "Veri yok"
 
-    prompt = f"""Profesyonel futbol bahis analisti. Türkçe. Takım isimlerini kullan. Jenerik cümle yasak.
+    # Oran segmenti
+    oran_seg = odds_to_prompt_segment(odds_analysis, h, a) if odds_analysis else "Oran verisi girilmedi"
 
+    # İY kritik skor olasılıkları (Poisson matrisinden)
+    iy_11 = next((round(v,1) for (hg,ag),v in top_ht if hg==1 and ag==1), 0)
+    iy_10 = next((round(v,1) for (hg,ag),v in top_ht if hg==1 and ag==0), 0)
+    iy_01 = next((round(v,1) for (hg,ag),v in top_ht if hg==0 and ag==1), 0)
+    iy_00 = next((round(v,1) for (hg,ag),v in top_ht if hg==0 and ag==0), 0)
+    iy_21 = next((round(v,1) for (hg,ag),v in top_ht if hg==2 and ag==1), 0)
+    iy_12 = next((round(v,1) for (hg,ag),v in top_ht if hg==1 and ag==2), 0)
+    iy_22 = next((round(v,1) for (hg,ag),v in top_ht if hg==2 and ag==2), 0)
+    iy_20 = next((round(v,1) for (hg,ag),v in top_ht if hg==2 and ag==0), 0)
+    iy_02 = next((round(v,1) for (hg,ag),v in top_ht if hg==0 and ag==2), 0)
+
+    # MS kritik skor olasılıkları
+    ms_10 = next((round(v,1) for (hg,ag),v in top_ms if hg==1 and ag==0), 0)
+    ms_20 = next((round(v,1) for (hg,ag),v in top_ms if hg==2 and ag==0), 0)
+    ms_21 = next((round(v,1) for (hg,ag),v in top_ms if hg==2 and ag==1), 0)
+    ms_11 = next((round(v,1) for (hg,ag),v in top_ms if hg==1 and ag==1), 0)
+    ms_01 = next((round(v,1) for (hg,ag),v in top_ms if hg==0 and ag==1), 0)
+    ms_02 = next((round(v,1) for (hg,ag),v in top_ms if hg==0 and ag==2), 0)
+    ms_12 = next((round(v,1) for (hg,ag),v in top_ms if hg==1 and ag==2), 0)
+    ms_22 = next((round(v,1) for (hg,ag),v in top_ms if hg==2 and ag==2), 0)
+    ms_30 = next((round(v,1) for (hg,ag),v in top_ms if hg==3 and ag==0), 0)
+    ms_31 = next((round(v,1) for (hg,ag),v in top_ms if hg==3 and ag==1), 0)
+
+    prompt = f"""Sen bir Profesyonel Betting Analyst + Pattern Engine olarak çalışıyorsun.
+Türkçe yaz. Takım isimlerini her zaman kullan. Jenerik/genel cümleler yasak — her cümle bu maça özgü olmalı.
+Veri yoksa "veri yetersiz" yaz. İstatistik ile öneri çelişmeyecek.
+
+═══════════════════════════════════════
+MAÇ VERİSİ (Ham Input)
+═══════════════════════════════════════
 KARAKTER: {" | ".join(chars)}
-MAÇ: {h}(Ev) vs {a}(Dep)
-PUAN: {h} S:{hs.get('position','?')} {hs.get('won','?')}G-{hs.get('draw','?')}B-{hs.get('lost','?')}M GolAV:{hs.get('goalDifference',0):+d} P:{hs.get('points','?')}
-PUAN: {a} S:{as_.get('position','?')} {as_.get('won','?')}G-{as_.get('draw','?')}B-{as_.get('lost','?')}M GolAV:{as_.get('goalDifference',0):+d} P:{as_.get('points','?')}
-GOLCÜ: {h_sc_str} | {a_sc_str}
-{h} FORM: {fv(hf,'form_str','?')} {fv(hf,'pts5')}/15 | Gol:{fv(hf,'avg_gf')}/{fv(hf,'avg_gc')} | İY:{fv(hf,'ht_avg_gf')}/{fv(hf,'ht_avg_gc')} | 2Y:{fv(hf,'st_avg_gf')}/{fv(hf,'st_avg_gc')} | %{fv(hf,'ht_pct',45)}İY-%{fv(hf,'st_pct',55)}2Y | KG:{fv(hf,'btts')}/{fv(hf,'n')} Üst25:{fv(hf,'o25')}/{fv(hf,'n')} CS:{fv(hf,'cs')}/{fv(hf,'n')} | SonMS:{" ".join((hf.get('ms_scores',[]) if hf else [])[:4])} İY:{" ".join((hf.get('ht_scores',[]) if hf else [])[:4])}
-{a} FORM: {fv(af,'form_str','?')} {fv(af,'pts5')}/15 | Gol:{fv(af,'avg_gf')}/{fv(af,'avg_gc')} Dep:{fv(af,'a_avg_gf')}/{fv(af,'a_avg_gc')} | İY:{fv(af,'ht_avg_gf')}/{fv(af,'ht_avg_gc')} | 2Y:{fv(af,'st_avg_gf')}/{fv(af,'st_avg_gc')} | %{fv(af,'ht_pct',45)}İY-%{fv(af,'st_pct',55)}2Y | KG:{fv(af,'btts')}/{fv(af,'n')} Üst25:{fv(af,'o25')}/{fv(af,'n')} CS:{fv(af,'cs')}/{fv(af,'n')} | SonMS:{" ".join((af.get('ms_scores',[]) if af else [])[:4])} İY:{" ".join((af.get('ht_scores',[]) if af else [])[:4])}
-H2H({h2h.get('n',0)}maç): {h} {h2h.get('hw',0)}G-{h2h.get('dr',0)}B-{h2h.get('aw',0)}M | İY:{h2h.get('ht_hw',0)}G-{h2h.get('ht_dr',0)}B-{h2h.get('ht_aw',0)}M | MS:{" ".join(h2h.get('ms_scores',[])[:4])} İY:{" ".join(h2h.get('ht_scores',[])[:4])} | Gol:{h2h.get('avg_goals',0)} Üst25:{h2h.get('o25_pct',0)}% KG:{h2h.get('btts_pct',0)}% | 2/1:{h2h.get('rev21',0)}/{h2h.get('n',0)}(%{h2h.get('rev21_pct',0)}) 1/2:{h2h.get('rev12',0)}/{h2h.get('n',0)}(%{h2h.get('rev12_pct',0)})
-ORANLAR: {odds_to_prompt_segment(odds_analysis, h, a) if odds_analysis else "Oran girilmedi"}
-MODEL: {h}xG={hxg}(İY:{h_htxg}) {a}xG={axg}(İY:{a_htxg}) | MS:1=%{stats['p1']} X=%{stats['px']} 2=%{stats['p2']} | İY:1=%{stats['iy1']} X=%{stats['iyx']} 2=%{stats['iy2']} | TopMS:{" ".join(f"{hg}-{ag}(%{round(v,1)})" for(hg,ag),v in top_ms[:5])} | TopİY:{" ".join(f"{hg}-{ag}(%{round(v,1)})" for(hg,ag),v in top_ht[:4])} | KG={stats['kg']}% Üst25={stats['u25']}% Üst35={stats['u35']}% | Kombo:{" ".join(f"{k}=%{round(v,1)}%" for k,v in stats['combos'][:5])} | Model2/1={stats['rev21']}% Model1/2={stats['rev12']}%
+MAÇ: {h} (Ev) vs {a} (Deplasman)
 
-AYNEN bu formatta yaz (başlıkları değiştirme):
+{h} PUAN DURUMU: Sıra:{hs.get('position','?')} | {hs.get('won','?')}G-{hs.get('draw','?')}B-{hs.get('lost','?')}M | GolFarkı:{hs.get('goalDifference',0):+d} | Puan:{hs.get('points','?')}
+{a} PUAN DURUMU: Sıra:{as_.get('position','?')} | {as_.get('won','?')}G-{as_.get('draw','?')}B-{as_.get('lost','?')}M | GolFarkı:{as_.get('goalDifference',0):+d} | Puan:{as_.get('points','?')}
+GOLCÜLER: {h}→{h_sc_str} | {a}→{a_sc_str}
 
-### 1) EN OLASI İY SKORU
-[skor] (%xx) — [bu maça özgü gerekçe, İY xG ve İY H2H bazlı]
+{h} FORM ({fv(hf,'n',0)} maç): {fv(hf,'form_str','?')} | Son5:{fv(hf,'pts5')}/15
+  Gol Ort: {fv(hf,'avg_gf')} attı/{fv(hf,'avg_gc')} yedi | İç Saha: {fv(hf,'h_avg_gf')}/{fv(hf,'h_avg_gc')} ({fv(hf,'h_n')} maç)
+  İY Gol: {fv(hf,'ht_avg_gf')} attı/{fv(hf,'ht_avg_gc')} yedi | 2Y Gol: {fv(hf,'st_avg_gf')} attı/{fv(hf,'st_avg_gc')} yedi
+  Gol Zamanı: %{fv(hf,'ht_pct',45)} İlk Yarı / %{fv(hf,'st_pct',55)} İkinci Yarı
+  KG VAR: {fv(hf,'btts')}/{fv(hf,'n')} | 2.5 Üst: {fv(hf,'o25')}/{fv(hf,'n')} | 3.5 Üst: {fv(hf,'o35')}/{fv(hf,'n')} | CS: {fv(hf,'cs')}/{fv(hf,'n')}
+  Son MS Skorları: {" ".join((hf.get('ms_scores',[]) if hf else [])[:5])}
+  Son İY Skorları: {" ".join((hf.get('ht_scores',[]) if hf else [])[:5])}
+  Seri: {fv(hf,'streak','?')}
 
-### 2) EN OLASI MS SKORU
-[skor] (%xx) — [xG, form, H2H bazlı gerekçe]
+{a} FORM ({fv(af,'n',0)} maç): {fv(af,'form_str','?')} | Son5:{fv(af,'pts5')}/15
+  Gol Ort: {fv(af,'avg_gf')} attı/{fv(af,'avg_gc')} yedi | Deplasman: {fv(af,'a_avg_gf')}/{fv(af,'a_avg_gc')} ({fv(af,'a_n')} maç)
+  İY Gol: {fv(af,'ht_avg_gf')} attı/{fv(af,'ht_avg_gc')} yedi | 2Y Gol: {fv(af,'st_avg_gf')} attı/{fv(af,'st_avg_gc')} yedi
+  Gol Zamanı: %{fv(af,'ht_pct',45)} İlk Yarı / %{fv(af,'st_pct',55)} İkinci Yarı
+  KG VAR: {fv(af,'btts')}/{fv(af,'n')} | 2.5 Üst: {fv(af,'o25')}/{fv(af,'n')} | 3.5 Üst: {fv(af,'o35')}/{fv(af,'n')} | CS: {fv(af,'cs')}/{fv(af,'n')}
+  Son MS Skorları: {" ".join((af.get('ms_scores',[]) if af else [])[:5])}
+  Son İY Skorları: {" ".join((af.get('ht_scores',[]) if af else [])[:5])}
+  Seri: {fv(af,'streak','?')}
 
-### 3) SENARYOLAR
-İY [X-Y] → 2Y [X-Y] → MS [X-Y] | %xx | [açıklama]
-İY [X-Y] → 2Y [X-Y] → MS [X-Y] | %xx | [açıklama]
-İY [X-Y] → 2Y [X-Y] → MS [X-Y] | %xx | [açıklama]
-İY [X-Y] → 2Y [X-Y] → MS [X-Y] | %xx | [açıklama]
+H2H ({h2h.get('n',0)} maç): {h} {h2h.get('hw',0)}G-{h2h.get('dr',0)}B-{h2h.get('aw',0)}M
+  İY Sonuçları: {h} {h2h.get('ht_hw',0)}G-{h2h.get('ht_dr',0)}B-{h2h.get('ht_aw',0)}M
+  H2H MS Skorları: {" ".join(h2h.get('ms_scores',[])[:5])}
+  H2H İY Skorları: {" ".join(h2h.get('ht_scores',[])[:5])}
+  Gol/Maç: {h2h.get('avg_goals',0)} | 2.5 Üst: %{h2h.get('o25_pct',0)} | KG VAR: %{h2h.get('btts_pct',0)}
+  DÖNÜŞ → 2/1: {h2h.get('rev21',0)}/{h2h.get('n',0)} maç (%{h2h.get('rev21_pct',0)}) | 1/2: {h2h.get('rev12',0)}/{h2h.get('n',0)} maç (%{h2h.get('rev12_pct',0)})
+  X→1: {h2h.get('revx1',0)}/{h2h.get('n',0)} (%{h2h.get('revx1_pct',0)}) | X→2: {h2h.get('revx2',0)}/{h2h.get('n',0)} (%{h2h.get('revx2_pct',0)})
 
-### 4) MS 1/X/2
-1 (%{stats['p1']}): [gerekçe]
-X (%{stats['px']}): [gerekçe]
-2 (%{stats['p2']}): [gerekçe]
+{oran_seg}
 
-### 5) GOL TAHMİNLERİ
-KG VAR (%{stats['kg']}): [gerekçe]
-2.5 ÜST (%{stats['u25']}): [gerekçe]
-2.5 ALT (%{stats['alt25']}): [gerekçe]
-3.5 ÜST (%{stats['u35']}): [gerekçe]
+POISSON MODEL:
+  xG: {h}={hxg}(İY:{h_htxg}) | {a}={axg}(İY:{a_htxg})
+  MS Olasılık: 1=%{stats['p1']} X=%{stats['px']} 2=%{stats['p2']}
+  İY Olasılık: 1=%{stats['iy1']} X=%{stats['iyx']} 2=%{stats['iy2']}
+  Model Dönüş: 2/1=%{stats['rev21']}% | 1/2=%{stats['rev12']}%
+  KG=%{stats['kg']}% | 2.5Üst=%{stats['u25']}% | 2.5Alt=%{stats['alt25']}% | 3.5Üst=%{stats['u35']}%
+  Top İY/MS Kombolar: {" ".join(f"{k}={round(v,1)}%" for k,v in stats['combos'][:6])}
 
-### 6) 2/1 DÖNÜŞ
-Model: %{stats['rev21']} | H2H: %{h2h.get('rev21_pct',0)} ({h2h.get('rev21',0)}/{h2h.get('n',0)} maç) | {h} 2Y yükü: %{fv(hf,'st_pct',55)}
-Senaryo: [kısa]
-NET: [gerçekçi mi, neden?]
+İY SKOR OLASILIKLARI (Poisson):
+  0-0=%{iy_00}% | 1-0=%{iy_10}% | 0-1=%{iy_01}% | 1-1=%{iy_11}%
+  2-0=%{iy_20}% | 0-2=%{iy_02}% | 2-1=%{iy_21}% | 1-2=%{iy_12}% | 2-2=%{iy_22}%
 
-### 7) 1/2 DÖNÜŞ
-Model: %{stats['rev12']} | H2H: %{h2h.get('rev12_pct',0)} ({h2h.get('rev12',0)}/{h2h.get('n',0)} maç) | {a} 2Y yükü: %{fv(af,'st_pct',55)}
-Senaryo: [kısa]
-NET: [gerçekçi mi, neden?]
+MS SKOR OLASILIKLARI (Poisson):
+  1-0=%{ms_10}% | 2-0=%{ms_20}% | 2-1=%{ms_21}% | 1-1=%{ms_11}%
+  0-1=%{ms_01}% | 0-2=%{ms_02}% | 1-2=%{ms_12}% | 2-2=%{ms_22}%
+  3-0=%{ms_30}% | 3-1=%{ms_31}%
+  Top5 MS: {" ".join(f"{hg}-{ag}(%{round(v,1)})" for(hg,ag),v in top_ms[:5])}
+  Top4 İY: {" ".join(f"{hg}-{ag}(%{round(v,1)})" for(hg,ag),v in top_ht[:4])}
 
-### 8) MAÇ ANALİZİ
-[3 cümle — bu maçın spesifik hikayesi]
+═══════════════════════════════════════
+ANALİZ FORMATI — AYNEN BU YAPIDA YAZ
+═══════════════════════════════════════
 
-### 9) TAVSİYELER
-BANKO: [tahmin] — %xx — [gerekçe]
-ORTA: [tahmin] — %xx — [gerekçe]
-RİSKLİ: [tahmin] — [gerekçe]
-SKOR: İY [X-Y] + MS [X-Y] — [gerekçe]"""
+### 🔍 1. Genel Maç Analizi
+[{h} ve {a} form durumu karşılaştırması, xG farkı, savunma/hücum zayıf noktaları. 3-4 cümle, tamamen bu maça özgü.]
+
+### ⏱️ 2. İlk Yarı (İY) Analizi
+İY Gol Ort: {h}={fv(hf,'ht_avg_gf',0)} | {a}={fv(af,'ht_avg_gf',0)}
+İY xG: {h}={h_htxg} | {a}={a_htxg}
+İY 0.5 Üst ihtimali: %[hesapla = 100 - iy_00 yuvarla]
+İY 1.5 Üst ihtimali: %[hesapla]
+İY 1-1 ihtimali: %{iy_11}
+KRİTİK SKOR ANALİZİ:
+  → İY 2-1 (%{iy_21}): [bu skor çıkarsa ne anlama gelir, dönüş sinyali mi?]
+  → İY 1-2 (%{iy_12}): [bu skor çıkarsa ne anlama gelir, dönüş sinyali mi?]
+  → İY 2-2 (%{iy_22}): [yüksek varyans durumu — analiz et]
+Erken Gol Riski: [{h} ve {a}'nın 0-15 dk gol üretimi forma göre yorumla]
+[İY genel yorumu — 2-3 cümle]
+
+### 🔁 3. 2/1 – 1/2 Dönüş Analizi
+**2/1 Dönüş** ({a} öne geçip {h} döner):
+  H2H Geçmiş: %{h2h.get('rev21_pct',0)} ({h2h.get('rev21',0)}/{h2h.get('n',0)} maç)
+  Model Olasılık: %{stats['rev21']}
+  {h} 2Y Gol Yükü: %{fv(hf,'st_pct',55)} | {a} 2Y Savunma: {fv(af,'st_avg_gc',0)} yenilen/maç
+  Oran Pattern Etkisi: [oran yapısı bu dönüşü destekliyor mu?]
+  NET Değerlendirme: [gerçekçi mi, hangi koşulda olur?]
+
+**1/2 Dönüş** ({h} öne geçip {a} döner):
+  H2H Geçmiş: %{h2h.get('rev12_pct',0)} ({h2h.get('rev12',0)}/{h2h.get('n',0)} maç)
+  Model Olasılık: %{stats['rev12']}
+  {a} 2Y Gol Yükü: %{fv(af,'st_pct',55)} | {h} 2Y Savunma: {fv(hf,'st_avg_gc',0)} yenilen/maç
+  Oran Pattern Etkisi: [oran yapısı bu dönüşü destekliyor mu?]
+  NET Değerlendirme: [gerçekçi mi, hangi koşulda olur?]
+
+### 🎯 4. Skor Olasılık Dağılımı
+**İY En Olası 3 Skor:**
+1. [skor] %[pct] — [bu maça özgü kısa gerekçe]
+2. [skor] %[pct] — [gerekçe]
+3. [skor] %[pct] — [gerekçe]
+
+**MS En Olası 5 Skor:**
+1. [skor] %[pct] — [xG + form bazlı gerekçe]
+2. [skor] %[pct] — [gerekçe]
+3. [skor] %[pct] — [gerekçe]
+4. [skor] %[pct] — [gerekçe]
+5. [skor] %[pct] — [gerekçe]
+
+Beklenen Gol: {h} xG={hxg} | {a} xG={axg} | Toplam={round(hxg+axg,2)}
+
+### 📊 5. Oran Analizi ve İstatistiksel Destek
+Açılış Oranı: 1={odds_analysis.get('o1','?') if odds_analysis else '?'} X={odds_analysis.get('ox','?') if odds_analysis else '?'} 2={odds_analysis.get('o2','?') if odds_analysis else '?'}
+Implied Probability: 1=%{odds_analysis['imp']['p1'] if odds_analysis else '?'} X=%{odds_analysis['imp']['px'] if odds_analysis else '?'} 2=%{odds_analysis['imp']['p2'] if odds_analysis else '?'}
+Vig (bookmaker marjı): %{odds_analysis['imp']['vig'] if odds_analysis else '?'}
+Model vs Piyasa Farkı: 1=+%{round(stats['p1']-(odds_analysis['imp']['p1'] if odds_analysis else stats['p1']),1)} X=+%{round(stats['px']-(odds_analysis['imp']['px'] if odds_analysis else stats['px']),1)} 2=+%{round(stats['p2']-(odds_analysis['imp']['p2'] if odds_analysis else stats['p2']),1)}
+Risk Seviyesi: {odds_analysis.get('risk_level','?') if odds_analysis else 'Veri yok'}
+Market Bias: [piyasa hangi sonucu fazla/az fiyatlamış? Model-piyasa farkına göre yorum yap]
+Value Fırsatı: [en yüksek edge hangi tarafta? Açıkça belirt]
+Bu Oran Aralığında Tarihsel Örüntü: [benzer oran yapılı maçlarda ne tür sonuçlar çıkmış? H2H + form verisine dayandır]
+
+### 🧩 6. Tahmin Sonuçları
+BANKO: [tahmin] — %[veri uyumu, min 75%] — [istatistiksel gerekçe, en az 2 veri noktası]
+ORTA: [tahmin] — %[55-75 arası] — [gerekçe]
+SÜRPRİZ: [yüksek varyans veya <55% tahmin] — [neden riskli?]
+SKOR ÖNERİSİ: İY [X-Y] + MS [X-Y] — [tutarlı gerekçe, skor dağılımıyla çelişmemeli]
+
+### 📌 7. Profesyonel Son Yorum
+[Analizin 3-4 cümlelik kısa özeti. Maç tipi (defensif mi, açık mı, dönüş riski var mı?), en önemli 2 faktör, genel betting notu. Takım isimlerini kullan.]"""
+
     return prompt
 
 
@@ -1638,7 +1738,7 @@ def groq_call(prompt, retries=4):
                 json={"model":groq_model,
                       "messages":[{"role":"user","content":prompt}],
                       "temperature":0.2,
-                      "max_tokens":2000},   # 3500'den 2000'e düşürdük
+                      "max_tokens":3500},   # Profesyonel 7-bölüm analiz için artırıldı
                 timeout=120)
 
             if r.status_code == 429:
@@ -1681,55 +1781,67 @@ def groq_call(prompt, retries=4):
 
 def parse_analysis(text):
     import re
-    parts = re.split(r'###\s*\d+\)\s*', text)
-    hdrs  = re.findall(r'###\s*\d+\)\s*(.+)', text)
+
+    # Yeni format: ### 🔍 1. Başlık  VEYA eski format: ### 1) Başlık
+    # Her iki formatı da destekle
+    parts = re.split(r'###\s*(?:[^\d]*)?\d+[.)]\s*', text)
+    hdrs  = re.findall(r'###\s*(?:[^\d]*)?\d+[.)]\s*(.+)', text)
     secs  = {}
     for hdr, content in zip(hdrs, parts[1:]):
-        secs[hdr.strip().upper()] = content.strip()
+        key = hdr.strip().upper()
+        # Emoji ve özel karakterleri temizle (eşleştirme için)
+        key_clean = re.sub(r'[^\w\s]', ' ', key).strip()
+        secs[key_clean] = content.strip()
 
-    # Senaryoları parse et
+    # Senaryoları parse et — Bölüm 3 (Dönüş Analizi) veya eski SENARYOLAR
     scenarios = []
-    for k,v in secs.items():
-        if "SENARYO" in k:
+    for k, v in secs.items():
+        if any(x in k for x in ["SENARYO", "DÖNÜ", "DONUS", "2 1", "1 2"]):
             for line in v.split("\n"):
                 line = line.strip()
                 if not line: continue
                 m = re.search(r'İY\s*(\d-\d).*?2Y\s*(\d-\d).*?MS\s*(\d-\d).*?%\s*(\d+\.?\d*)', line, re.I)
                 if m:
                     scenarios.append({
-                        "iy":m.group(1),"2y":m.group(2),
-                        "ms":m.group(3),"pct":m.group(4),
+                        "iy": m.group(1), "2y": m.group(2),
+                        "ms": m.group(3), "pct": m.group(4),
                         "desc": line
                     })
-            break
 
-    # Tavsiyeler
+    # Tavsiyeler — Bölüm 6 (Tahmin Sonuçları) veya eski TAVSİYELER
     preds = {}
-    for k,v in secs.items():
-        if "TAVSİYE" in k or "TAVSIYE" in k:
+    for k, v in secs.items():
+        if any(x in k for x in ["TAHMİN", "TAHMIN", "TAVSİYE", "TAVSIYE", "SONUÇ", "SONUC"]):
             for line in v.split("\n"):
-                for tag in ["BANKO","ORTA","RİSKLİ","RISKI","SKOR"]:
-                    if line.strip().upper().startswith(tag):
-                        preds[tag.rstrip("İ").rstrip("Ş")] = line.split(":",1)[-1].strip()
+                line_up = line.strip().upper()
+                for tag in ["BANKO", "ORTA", "SÜRPRİZ", "SURPRIZ", "RİSKLİ", "RISKLI", "SKOR"]:
+                    tag_norm = tag.replace("İ","I").replace("Ş","S").replace("Ü","U").replace("Ö","O")
+                    line_norm = line_up.replace("İ","I").replace("Ş","S").replace("Ü","U").replace("Ö","O")
+                    if line_norm.startswith(tag_norm):
+                        key_out = "SKOR" if "SKOR" in tag else tag_norm[:5]
+                        preds[key_out] = line.split(":", 1)[-1].strip()
 
-    # Özel skor listeleri — İY ve MS yüksek skorlar
-    def parse_score_list(text):
+    # Özel skor listeleri — Bölüm 4 (Skor Dağılımı) → İY ve MS
+    def parse_score_list(section_text):
         items = []
-        for line in text.split("\n"):
+        for line in section_text.split("\n"):
             line = line.strip()
             if not line: continue
-            m = re.search(r"(\d-\d)\s*\(%?\s*(\d+\.?\d*)\s*\)\s*[—–-]?\s*(.*)", line)
+            m = re.search(r"(\d-\d)\s*%?(\d+\.?\d*)[%\s]*[—–\-]?\s*(.*)", line)
             if m:
                 items.append({"score": m.group(1), "pct": m.group(2), "why": m.group(3).strip()})
         return items
 
     iy_special = []
     ms_special = []
-    for k,v in secs.items():
-        if "İLK YARI ÖZEL" in k or "IY ÖZEL" in k or "ILK YARI" in k.replace("İ","I"):
-            iy_special = parse_score_list(v)
-        if "MAÇ SONU ÖZEL" in k or "MAC SONU" in k.replace("Ç","C"):
-            ms_special = parse_score_list(v)
+    for k, v in secs.items():
+        k_norm = k.replace("İ","I").replace("Ş","S").replace("Ü","U").replace("Ö","O")
+        if any(x in k_norm for x in ["SKOR OLASILIK", "SKOR DAGILIM", "ILK YARI OZEL", "IY OZEL"]):
+            # İY satırlarını çek
+            iy_block = re.search(r'IY.*?(?=MS|$)', v, re.S | re.I)
+            ms_block = re.search(r'MS.*', v, re.S | re.I)
+            if iy_block: iy_special = parse_score_list(iy_block.group())
+            if ms_block: ms_special = parse_score_list(ms_block.group())
 
     return secs, scenarios, preds, iy_special, ms_special
 
@@ -2097,20 +2209,24 @@ def render_vs_ui(match, hf, af, h2h, hxg, axg, h_htxg, a_htxg,
     st.markdown(combo_html, unsafe_allow_html=True)
 
     # ── 10. DÖNÜŞ ANALİZİ ────────────────────────────────────
-    rev21_m = stats['rev21']; rev21_h = h2h.get('rev21_pct',0)
-    rev12_m = stats['rev12']; rev12_h = h2h.get('rev12_pct',0)
-    hot21 = rev21_m > 10 or rev21_h > 20
-    hot12 = rev12_m > 10 or rev12_h > 20
-    d21 = " ".join(secs.get("2/1 DÖNÜŞ","").split()[:50]) if secs.get("2/1 DÖNÜŞ") else ""
-    d12 = " ".join(secs.get("1/2 DÖNÜŞ","").split()[:50]) if secs.get("1/2 DÖNÜŞ") else ""
-
     # ── 10. DÖNÜŞ ANALİZİ — Python ile oluştur (tag güvenliği) ──
     rev21_m = stats['rev21']; rev21_h = h2h.get('rev21_pct',0)
     rev12_m = stats['rev12']; rev12_h = h2h.get('rev12_pct',0)
     hot21 = rev21_m > 10 or rev21_h > 20
     hot12 = rev12_m > 10 or rev12_h > 20
-    d21_txt = " ".join(secs.get("2/1 DÖNÜŞ","").split()[:60]) if secs.get("2/1 DÖNÜŞ") else ""
-    d12_txt = " ".join(secs.get("1/2 DÖNÜŞ","").split()[:60]) if secs.get("1/2 DÖNÜŞ") else ""
+    # Yeni format bölüm 3 içinden 2/1 ve 1/2 blokları çek
+    def _find_sec(secs_dict, *keywords):
+        for k, v in secs_dict.items():
+            k_norm = k.upper().replace("İ","I").replace("Ö","O").replace("Ü","U").replace("Ş","S").replace("Ç","C").replace("/","").replace("-","")
+            if all(kw.upper() in k_norm for kw in keywords):
+                return v
+        return ""
+    import re as _re21
+    _donus_full = _find_sec(secs, "DON")
+    _m21 = _re21.search(r'2/1.*?(?=\*\*1/2|\Z)', _donus_full, _re21.S|_re21.I) if _donus_full else None
+    _m12 = _re21.search(r'1/2.*',               _donus_full, _re21.S|_re21.I) if _donus_full else None
+    d21_txt = " ".join((_m21.group(0) if _m21 else _find_sec(secs,"2","1","DON")).split()[:80])
+    d12_txt = " ".join((_m12.group(0) if _m12 else _find_sec(secs,"1","2","DON")).split()[:80])
 
     def _donus_card(title, explain, model_pct, h2h_pct, h2h_n, h2h_total,
                     team1_lbl, team1_pct, team1_color,
@@ -2318,7 +2434,7 @@ def render_vs_ui(match, hf, af, h2h, hxg, axg, h_htxg, a_htxg,
     # ── 12. TAVSİYELER ────────────────────────────────────────
     banko  = preds.get("BANKO","")
     orta   = preds.get("ORTA","")
-    risky  = preds.get("RISKI", preds.get("RİSKLİ",""))
+    risky  = preds.get("RISKI", preds.get("RISKL", preds.get("SURPR", preds.get("RİSKLİ",""))))
     skor   = preds.get("SKOR","")
 
     tav_html = '<div class="tahmin-panel"><div class="dp-section-title">PROFESYONEL TAVSİYELER</div>'
@@ -2390,9 +2506,15 @@ def render_vs_ui(match, hf, af, h2h, hxg, axg, h_htxg, a_htxg,
 
     # ── 13. MAÇ ANALİZİ METNİ ────────────────────────────────
     analiz_text = ""
-    for k,v in secs.items():
-        if "ANALİZ" in k or "ANALIZ" in k:
+    for k, v in secs.items():
+        k_norm = k.replace("İ","I").replace("Ş","S").replace("Ü","U").replace("Ö","O").replace("Ç","C")
+        if any(x in k_norm for x in ["GENEL MAC", "GENEL MAÇ", "GENEL ANALIZ", "SON YORUM", "PROFESYONEL SON", "PROFESYONEL MAC"]):
             analiz_text = v; break
+    if not analiz_text:
+        # Fallback: "ANALIZ" içeren herhangi bir section
+        for k, v in secs.items():
+            if "ANALIZ" in k.replace("İ","I").replace("Ş","S").replace("Ü","U").replace("Ö","O").replace("Ç","C"):
+                analiz_text = v; break
     if analiz_text:
         st.markdown(f"""
 <div class="analiz-panel">
