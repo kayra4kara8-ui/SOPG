@@ -513,18 +513,43 @@ border-radius:6px;padding:8px 10px;font-size:.73rem;color:#7a9ab8;line-height:1.
 # ══════════════════════════════════════════════════════════════════
 BASE = "https://api.football-data.org/v4"
 
-def fd_get(path, params=None):
-    try:
-        r = requests.get(f"{BASE}{path}", headers={"X-Auth-Token": FD_KEY},
-                         params=params or {}, timeout=15)
-        if r.status_code == 429:
-            st.warning("⏳ Rate limit — 65sn..."); time.sleep(66)
-            r = requests.get(f"{BASE}{path}", headers={"X-Auth-Token": FD_KEY},
-                             params=params or {}, timeout=15)
-        if debug: st.caption(f"🐛 {path} → {r.status_code}")
-        return r.json() if r.status_code == 200 else {}
-    except Exception as e:
-        st.error(f"API: {e}"); return {}
+def fd_get(path, params=None, _retries=3):
+    headers = {"X-Auth-Token": FD_KEY}
+    url     = f"{BASE}{path}"
+    for attempt in range(_retries):
+        try:
+            r = requests.get(url, headers=headers,
+                             params=params or {},
+                             timeout=(8, 30))  # (connect, read) — read 30sn
+            if r.status_code == 429:
+                wait = 66 if attempt == 0 else 10
+                ph = st.empty()
+                for i in range(wait, 0, -1):
+                    ph.warning(f"⏳ Rate limit — {i}sn bekleniyor...")
+                    time.sleep(1)
+                ph.empty()
+                continue
+            if r.status_code == 200:
+                if debug: st.caption(f"🐛 {path} → 200")
+                return r.json()
+            if debug: st.caption(f"🐛 {path} → {r.status_code}")
+            return {}
+        except requests.exceptions.ReadTimeout:
+            if attempt < _retries - 1:
+                time.sleep(3 * (attempt + 1))
+                continue
+            st.warning(f"⚠️ Sunucu yanıt vermedi ({path}) — tekrar dene.")
+            return {}
+        except requests.exceptions.ConnectionError:
+            if attempt < _retries - 1:
+                time.sleep(4)
+                continue
+            st.warning(f"⚠️ Bağlantı hatası ({path})")
+            return {}
+        except Exception as e:
+            if debug: st.caption(f"🐛 fd_get {path}: {e}")
+            return {}
+    return {}
 
 def api_matches(code, dt, lim):
     d = fd_get(f"/competitions/{code}/matches",
@@ -608,7 +633,7 @@ def fetch_sofascore_live_stats(match_id_ss):
         }
         r = requests.get(
             f"https://api.sofascore.com/api/v1/event/{match_id_ss}/statistics",
-            headers=headers, timeout=10
+            headers=headers, timeout=20
         )
         if r.status_code == 200:
             return r.json()
@@ -632,7 +657,7 @@ def fetch_sofascore_live_event(h_name, a_name):
         today = _date.today().strftime("%Y-%m-%d")
         r = requests.get(
             f"https://api.sofascore.com/api/v1/sport/football/scheduled-events/{today}",
-            headers=headers, timeout=10
+            headers=headers, timeout=20
         )
         if r.status_code != 200:
             return None, None
@@ -650,7 +675,7 @@ def fetch_sofascore_live_event(h_name, a_name):
                 # İstatistikleri çek
                 r2 = requests.get(
                     f"https://api.sofascore.com/api/v1/event/{ev_id}/statistics",
-                    headers=headers, timeout=10
+                    headers=headers, timeout=20
                 )
                 stats_raw = r2.json() if r2.status_code == 200 else {}
                 return ev, stats_raw
@@ -1555,7 +1580,7 @@ def get_sofascore_odds(hn, an, match_date):
         # Günün tüm maçlarını çek
         r = requests.get(
             f"https://api.sofascore.com/api/v1/sport/football/scheduled-events/{match_date}",
-            headers=headers, timeout=12
+            headers=headers, timeout=20
         )
         if r.status_code != 200:
             if debug: st.caption(f"🐛 SofaScore HTTP {r.status_code}")
@@ -1581,7 +1606,7 @@ def get_sofascore_odds(hn, an, match_date):
         # Maçın oranlarını çek
         r2 = requests.get(
             f"https://api.sofascore.com/api/v1/event/{target_id}/odds/1/all",
-            headers=headers, timeout=12
+            headers=headers, timeout=20
         )
         if r2.status_code != 200:
             if debug: st.caption(f"🐛 SofaScore odds HTTP {r2.status_code}")
