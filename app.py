@@ -1011,6 +1011,10 @@ TARİHSEL FORM:
 
     return f"""Sen bir profesyonel canlı bahis analistisin. Türkçe yaz. Her cümle bu maça özgü olmalı — jenerik yorum yasak.
 
+ÖNEMLİ KURAL: "Bekle" veya "Şartlar oluşmadı" gibi genel geçer yanıtlar YASAK.
+Her pazar için kesin karar ver — ya AL ya GEÇME, gerekçesiyle birlikte.
+Veri yetersizse de o veriden çıkarım yap.
+
 MAÇ: {h} (EV) vs {a} (DEP) — Dakika: {minute}'
 {stat_block}
 {ht_block}
@@ -1020,26 +1024,25 @@ MAÇ: {h} (EV) vs {a} (DEP) — Dakika: {minute}'
 AYNEN bu formatta yaz (başlıkları değiştirme):
 
 ### 1. CANLI DURUM ANALİZİ
-[Hangi takım baskıda, momentum nerede, skor maça nasıl yansıyor — istatistik rakamlarını kullanarak 3 cümle]
+[Hangi takım baskıda, momentum nerede, istatistik rakamlarını kullanarak 2 cümle]
 
 {iy_section}
 
-### 3. MAÇ SONU GOL BEKLENT İSİ
-[xG hızı + form + kalan süreyi harmanlayarak MS gol beklentisini yorumla — özellikle 2.5 Üst/Alt ve KG VAR/YOK için net karar ver]
+### 3. MAÇ SONU GOL BEKLENTİSİ
+[xG hızı + form + kalan süreyi harmanlayarak 2.5 Üst/Alt ve KG VAR/YOK için NET karar — "Üst alınır çünkü..." veya "Alt alınır çünkü..." formatında]
 
 ### 4. GOL BAHİS TAVSİYELERİ
 GOL_BAHSI_1: [pazar] — [gerekçe, max 12 kelime] — GÜVENİLİRLİK: [YÜKSEK/ORTA/DÜŞÜK]
 GOL_BAHSI_2: [pazar] — [gerekçe, max 12 kelime] — GÜVENİLİRLİK: [YÜKSEK/ORTA/DÜŞÜK]
 GOL_BAHSI_3: [pazar] — [gerekçe, max 12 kelime] — GÜVENİLİRLİK: [YÜKSEK/ORTA/DÜŞÜK]
 
-Pazar seçenekleri (MOdele ipucu): "İY 0.5 ÜST", "İY 0.5 ALT", "İY 1.5 ÜST", "İY KG VAR", "İY KG YOK",
+Pazar seçenekleri: "İY 0.5 ÜST", "İY 0.5 ALT", "İY 1.5 ÜST", "İY KG VAR", "İY KG YOK",
 "2.5 ÜST", "2.5 ALT", "3.5 ÜST", "KG VAR", "KG YOK",
-"Sonraki gol EV", "Sonraki gol DEP", "Gol YOK (0.5 Alt)",
-"İY gol olmaz → MS gol olur"
+"Sonraki gol EV ({h})", "Sonraki gol DEP ({a})", "Gol YOK (0.5 Alt)"
 
-### 5. BEKLE / GEÇ SİNYALİ
-BEKLE: [Hangi bahis şu an açılmamalı ve neden — 1 cümle]
-GEÇ: [Hangi pazar için oran düştüyse artık geç — 1 cümle]"""
+### 5. EN İYİ BAHIS
+ŞIMDI_AL: [tek en iyi pazar] — [neden şu an ideal — max 15 kelime]
+GEÇME: [kaçınılacak pazar] — [neden riskli — max 12 kelime]"""
 
 # ══════════════════════════════════════════════════════════════════
 # VERİ İŞLEME
@@ -3054,14 +3057,16 @@ padding:.75rem 1.1rem;margin-bottom:.6rem">
   <div class="grb-conf">{conf}</div>
 </div>""", unsafe_allow_html=True)
 
-        # Bekle / Geç sinyali
+        # Bekle / Geç → artık ŞİMDİ AL / GEÇME formatında
         if bekle_txt:
-            bekle, gec = bekle_txt
-            st.markdown(f"""
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:.5rem">
-  {"" if not bekle else f'<div style="background:#120e00;border:1px solid #b45309;border-radius:7px;padding:.5rem .9rem;font-size:.72rem;color:#f5a623">⏳ <b>Bekle:</b> {bekle}</div>'}
-  {"" if not gec else f'<div style="background:#04180a;border:1px solid #166534;border-radius:7px;padding:.5rem .9rem;font-size:.72rem;color:#3ecf7a">✅ <b>Geç:</b> {gec}</div>'}
-</div>""", unsafe_allow_html=True)
+            simdi_al_txt, gecme_txt = bekle_txt
+            parts_html = ""
+            if simdi_al_txt:
+                parts_html += f'<div style="background:#04180a;border:1px solid #166534;border-radius:7px;padding:.5rem .9rem;font-size:.72rem;color:#3ecf7a">✅ <b>Şimdi Al:</b> {simdi_al_txt}</div>'
+            if gecme_txt:
+                parts_html += f'<div style="background:#120e00;border:1px solid #b45309;border-radius:7px;padding:.5rem .9rem;font-size:.72rem;color:#f5a623">🚫 <b>Geçme:</b> {gecme_txt}</div>'
+            if parts_html:
+                st.markdown(f'<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:.5rem">{parts_html}</div>', unsafe_allow_html=True)
 
 def _prob_box(label, val, is_xg=False):
     if is_xg:
@@ -3113,19 +3118,30 @@ def _extract_section(text, keyword):
     return ""
 
 def _extract_bekle_gec(text):
-    """BEKLE ve GEÇ satırlarını ayrı parse et."""
+    """ŞIMDI_AL ve GEÇME satırlarını parse et."""
     import re as _re
-    bekle = gec = ""
-    sec = _extract_section(text, "BEKLE")
-    if not sec:
-        return None
-    for line in sec.splitlines():
-        line = line.strip()
-        if line.upper().startswith("BEKLE"):
-            bekle = line.split(":",1)[-1].strip()[:150]
-        elif line.upper().startswith("GEÇ") or line.upper().startswith("GEC"):
-            gec = line.split(":",1)[-1].strip()[:150]
-    return (bekle, gec) if (bekle or gec) else None
+    simdi_al = gecme = ""
+    # Bölüm 5'i bul
+    sec_m = _re.search(r'###\s*5\..*?\n(.*?)(?=###|\Z)', text, _re.S | _re.I)
+    block = sec_m.group(1) if sec_m else text
+    for line in block.splitlines():
+        ls = line.strip()
+        if _re.match(r'(ŞIMDI_AL|SIMDI_AL|ŞİMDİ_AL)', ls, _re.I):
+            simdi_al = ls.split(":",1)[-1].strip()[:200]
+        elif _re.match(r'GEÇME|GECME', ls, _re.I):
+            gecme    = ls.split(":",1)[-1].strip()[:150]
+    return (simdi_al, gecme) if (simdi_al or gecme) else None
+
+def _extract_simdi_al(text):
+    """En iyi bahsi — ŞİMDİ AL satırından — ayıkla."""
+    import re as _re
+    m = _re.search(r'(ŞIMDI_AL|SIMDI_AL|ŞİMDİ_AL)\s*:\s*(.+?)(?:\n|$)', text, _re.I)
+    if m:
+        full = m.group(2).strip()
+        # Pazar adı — ilk "—" e kadar
+        parts = full.split("—")
+        return {"market": parts[0].strip(), "why": parts[1].strip() if len(parts) > 1 else ""}
+    return None
 
 
 # ── VS UI ── (mevcut render_vs_ui burada)
@@ -3829,82 +3845,152 @@ for k in ["live_matches","live_analyses","live_stats_cache"]:
 # CANLI MAÇ MODU
 # ══════════════════════════════════════════════════════════════════
 if app_mode == "🔴 Canlı Maçlar":
+
+    # ── BAŞLIK ───────────────────────────────────────────────────
     st.markdown("""
-<div class="live-header" style="margin-bottom:1rem">
+<div class="live-header" style="margin-bottom:.8rem">
   <div class="live-dot"></div>
   <span class="live-badge">CANLI ANALİZ</span>
-  <span class="live-title">Oynanan Maçlar — Gerçek Zamanlı Gol Bahis Rehberi</span>
+  <span class="live-title">Gerçek Zamanlı Gol Bahis Rehberi</span>
 </div>""", unsafe_allow_html=True)
 
-    # Kontrol satırı
-    lc1, lc2, lc3 = st.columns([2,2,3])
+    # ── KONTROLLER ───────────────────────────────────────────────
+    lc1, lc2, lc3, lc4 = st.columns([2,2,2,2])
     with lc1:
-        live_league = st.selectbox(
-            "Lig",
-            ["Tüm Ligler","PL","PD","BL1","SA","FL1","CL","EL"],
-            key="live_league_sel"
-        )
+        live_league = st.selectbox("Lig", ["Tüm Ligler","PL","PD","BL1","SA","FL1","CL","EL"], key="live_league_sel")
     with lc2:
-        live_refresh_btn = st.button("🔄 Canlı Maçları Çek / Yenile", type="primary", use_container_width=True, key="live_refresh")
+        live_refresh_btn = st.button("🔄 Maçları Çek/Yenile", type="primary", use_container_width=True, key="live_refresh")
     with lc3:
-        live_auto = st.checkbox("⚡ 60sn'de bir otomatik yenile", value=False, key="live_auto_refresh")
-
-    if live_auto:
-        time.sleep(1)  # Streamlit rerun tetikleyici
+        live_analyze_all_btn = st.button("🤖 Tümünü Analiz Et", use_container_width=True, key="live_all")
+    with lc4:
+        live_auto = st.checkbox("⚡ 60sn otomatik yenile", value=False, key="live_auto_refresh")
 
     st.divider()
 
-    # Canlı maçları çek
+    # ── MAÇLARI ÇEK ──────────────────────────────────────────────
     if live_refresh_btn or live_auto:
         code_filter = None if live_league == "Tüm Ligler" else live_league
         with st.spinner("📡 Canlı maçlar çekiliyor..."):
             live_ms = api_live_matches(code_filter)
 
-        # Eski/bitmiş maçları session_state'ten temizle
-        # Şu an gelen live_ms'deki ID'ler dışındakileri sil
+        # Bitmiş maçları temizle
         current_live_ids = {lm["id"] for lm in live_ms}
-        stale_ids = [k for k in st.session_state["live_matches"]
-                     if k not in current_live_ids]
-        for sid in stale_ids:
+        for sid in [k for k in st.session_state["live_matches"] if k not in current_live_ids]:
             st.session_state["live_matches"].pop(sid, None)
             st.session_state["live_analyses"].pop(sid, None)
 
         if not live_ms:
-            st.info("🔴 Şu anda oynanan maç bulunamadı. Ligler aktif değil veya API limiti dolmuş olabilir.")
+            st.info("🔴 Şu anda oynanan maç bulunamadı.")
         else:
-            st.success(f"✅ {len(live_ms)} canlı maç bulundu")
+            st.success(f"✅ {len(live_ms)} canlı maç")
             for lm in live_ms:
-                # Son bir kez status kontrolü — FINISHED gelmiş olabilir
                 if lm.get("status","") not in ("IN_PLAY","PAUSED"):
                     continue
-
                 lid  = lm["id"]
-                lhn  = lm["homeTeam"]["name"]
-                lan  = lm["awayTeam"]["name"]
                 lhid = lm["homeTeam"]["id"]
                 laid = lm["awayTeam"]["id"]
-                # Form verisi (önce cache'e bak)
-                fk = f"live_form_{lhid}_{laid}"
+                fk   = f"live_form_{lhid}_{laid}"
                 if fk not in st.session_state:
-                    hff = parse_form(api_team_matches(lhid, 8), lhid)
-                    aff = parse_form(api_team_matches(laid, 8), laid)
-                    h2hf= parse_h2h(api_h2h(lid, 6), lhid)
+                    hff  = parse_form(api_team_matches(lhid, 8), lhid)
+                    aff  = parse_form(api_team_matches(laid, 8), laid)
+                    h2hf = parse_h2h(api_h2h(lid, 6), lhid)
                     st.session_state[fk] = (hff, aff, h2hf)
                 else:
                     hff, aff, h2hf = st.session_state[fk]
-                st.session_state["live_matches"][lid] = {
-                    "match": lm, "hf": hff, "af": aff, "h2h": h2hf
-                }
+                st.session_state["live_matches"][lid] = {"match": lm, "hf": hff, "af": aff, "h2h": h2hf}
 
-    # Canlı maçları göster
+    # ── TÜMÜNÜ ANALİZ ET ─────────────────────────────────────────
+    if live_analyze_all_btn and st.session_state["live_matches"]:
+        total = len(st.session_state["live_matches"])
+        bar   = st.progress(0)
+        for idx, (lid, ld) in enumerate(st.session_state["live_matches"].items()):
+            lm   = ld["match"]
+            lhn  = lm["homeTeam"]["name"]
+            lan  = lm["awayTeam"]["name"]
+            lhsc = lm.get("score",{}).get("fullTime",{}).get("home") or 0
+            lasc = lm.get("score",{}).get("fullTime",{}).get("away") or 0
+            ht_h = lm.get("score",{}).get("halfTime",{}).get("home") or 0
+            ht_a = lm.get("score",{}).get("halfTime",{}).get("away") or 0
+            try:
+                minute_int = int(str(lm.get("minute","45")).replace("'","").strip())
+            except:
+                minute_int = 45
+            bar.progress((idx) / total, text=f"({idx+1}/{total}) {lhn} – {lan}")
+            ss_ev, ss_raw = fetch_sofascore_live_event(lhn, lan)
+            lstats = parse_live_stats(ss_raw)
+            lp_    = calc_live_goal_probability(lstats, minute_int, lhsc, lasc, ld["hf"], ld["af"])
+            prompt = build_live_prompt(lhn, lan, minute_int, lhsc, lasc, ht_h, ht_a, lstats, lp_, ld["hf"], ld["af"], ld["h2h"])
+            st.session_state["live_analyses"][lid] = groq_call(prompt)
+            if idx < total - 1:
+                time.sleep(5)
+        bar.progress(1.0); time.sleep(.3); bar.empty()
+        st.success("✅ Tüm analizler hazır!")
+        st.rerun()
+
+    # ── MAÇLAR YOK ───────────────────────────────────────────────
     if not st.session_state["live_matches"]:
         st.markdown("""
 <div style="background:#0d1829;border:1px solid #1c2e44;border-radius:10px;
 padding:2rem;text-align:center;color:#4a6880;font-size:.82rem">
-  🔴 Canlı maç görüntülemek için <b style="color:#d0dce8">Canlı Maçları Çek</b> butonuna bas.
+  🔴 <b style="color:#d0dce8">Canlı Maçları Çek</b> butonuna bas, ardından <b style="color:#d0dce8">Tümünü Analiz Et</b>
 </div>""", unsafe_allow_html=True)
     else:
-        for lid, ld in st.session_state["live_matches"].items():
+        # ── GÜVEN SKORUNA GÖRE SIRALA ─────────────────────────────
+        # Her analiz için en iyi bahsi bul ve güven skorunu hesapla
+        def _confidence_score(analysis_text):
+            """YÜKSEK=3, ORTA=2, DÜŞÜK=1 — en yüksek başa"""
+            if not analysis_text: return 0
+            import re as _re
+            vals = _re.findall(r'GÜVENİLİRLİK\s*:\s*(\w+)', analysis_text, _re.I)
+            score = 0
+            for v in vals:
+                v = v.upper()
+                if "YÜKSEK" in v: score += 3
+                elif "ORTA"  in v: score += 2
+                elif "DÜŞÜK" in v: score += 1
+            return score
+
+        sorted_matches = sorted(
+            st.session_state["live_matches"].items(),
+            key=lambda x: _confidence_score(st.session_state["live_analyses"].get(x[0], "")),
+            reverse=True
+        )
+
+        # ── EN İYİ TAVSİYE BANNER ────────────────────────────────
+        top_pick = None
+        for lid, ld in sorted_matches:
+            atxt = st.session_state["live_analyses"].get(lid, "")
+            pick = _extract_simdi_al(atxt)
+            if pick and pick.get("market"):
+                lm   = ld["match"]
+                top_pick = {
+                    "match": f"{lm['homeTeam']['name']} vs {lm['awayTeam']['name']}",
+                    "score": f"{lm.get('score',{}).get('fullTime',{}).get('home') or 0}–{lm.get('score',{}).get('fullTime',{}).get('away') or 0}",
+                    "minute": lm.get("minute","?"),
+                    **pick
+                }
+                break
+
+        if top_pick:
+            st.markdown(f"""
+<div style="background:linear-gradient(135deg,#04180a,#062010);border:2px solid #3ecf7a;
+border-radius:12px;padding:1rem 1.4rem;margin-bottom:1rem;
+display:flex;align-items:center;gap:14px">
+  <div style="font-size:1.6rem">🏆</div>
+  <div style="flex:1">
+    <div style="font-size:.54rem;font-weight:800;letter-spacing:.15em;color:#3ecf7a;
+    text-transform:uppercase;margin-bottom:3px">ŞİMDİ AL — En Güçlü Canlı Tavsiye</div>
+    <div style="font-size:1.1rem;font-weight:800;color:#d0dce8;
+    font-family:JetBrains Mono,monospace">{top_pick['market']}</div>
+    <div style="font-size:.72rem;color:#7a9ab8;margin-top:2px">{top_pick['match']} &nbsp;·&nbsp; {top_pick['score']} &nbsp;·&nbsp; {top_pick['minute']}'</div>
+    <div style="font-size:.68rem;color:#4a6880;margin-top:3px">{top_pick.get('why','')}</div>
+  </div>
+  <div style="background:#3ecf7a;color:#04180a;font-size:.7rem;font-weight:800;
+  letter-spacing:.08em;padding:5px 12px;border-radius:6px;white-space:nowrap">AL ✓</div>
+</div>""", unsafe_allow_html=True)
+
+        # ── HER MAÇ PANELİ ────────────────────────────────────────
+        for lid, ld in sorted_matches:
             lm   = ld["match"]
             lhn  = lm["homeTeam"]["name"]
             lan  = lm["awayTeam"]["name"]
@@ -3912,16 +3998,19 @@ padding:2rem;text-align:center;color:#4a6880;font-size:.82rem">
             lasc = lm.get("score",{}).get("fullTime",{}).get("away") or 0
             lmin = lm.get("minute","?")
             done = lid in st.session_state["live_analyses"]
+            cscore = _confidence_score(st.session_state["live_analyses"].get(lid,""))
+
+            # Confidence badge
+            conf_badge = "🟢 YÜKSEK" if cscore >= 6 else ("🟡 ORTA" if cscore >= 3 else ("🔴 DÜŞÜK" if done else ""))
 
             with st.expander(
-                f"🔴 {lhn} {lhsc}–{lasc} {lan}  ·  {lmin}'  {'✅ Analiz Hazır' if done else ''}",
-                expanded=True
+                f"🔴 {lhn} {lhsc}–{lasc} {lan}  ·  {lmin}'  {conf_badge}",
+                expanded=True  # hepsi açık
             ):
-                # SofaScore'dan canlı istatistik çek
-                ss_ev, ss_stats_raw = fetch_sofascore_live_event(lhn, lan)
-                live_stats = parse_live_stats(ss_stats_raw)
+                # SofaScore istatistik
+                ss_ev, ss_raw = fetch_sofascore_live_event(lhn, lan)
+                live_stats    = parse_live_stats(ss_raw)
 
-                # Canlı olasılık hesapla
                 try:
                     minute_int = int(str(lmin).replace("'","").strip())
                 except:
@@ -3930,49 +4019,57 @@ padding:2rem;text-align:center;color:#4a6880;font-size:.82rem">
                 ht_h = lm.get("score",{}).get("halfTime",{}).get("home") or 0
                 ht_a = lm.get("score",{}).get("halfTime",{}).get("away") or 0
 
-                lp = calc_live_goal_probability(
-                    live_stats, minute_int, lhsc, lasc, ld["hf"], ld["af"]
-                )
+                lp = calc_live_goal_probability(live_stats, minute_int, lhsc, lasc, ld["hf"], ld["af"])
 
-                # Analiz yap
-                if not done:
-                    col_a, col_b = st.columns([3,1])
-                    with col_a:
-                        st.caption(f"xG: {lhn} {live_stats.get('xg_h',0):.2f} – {live_stats.get('xg_a',0):.2f} {lan}  |  "
-                                   f"Tehlikeli Atak: {int(live_stats.get('dangerous_h',0))}–{int(live_stats.get('dangerous_a',0))}  |  "
-                                   f"Bkl.Ek Gol: {lp['expected_remaining']}")
-                    with col_b:
-                        if st.button("🤖 Canlı Analiz", key=f"live_btn_{lid}", type="primary"):
-                            with st.spinner("🦙 Groq analiz ediyor..."):
-                                prompt = build_live_prompt(
-                                    lhn, lan, minute_int, lhsc, lasc, ht_h, ht_a,
-                                    live_stats, lp, ld["hf"], ld["af"], ld["h2h"]
-                                )
-                                analysis = groq_call(prompt)
-                                st.session_state["live_analyses"][lid] = analysis
-                            st.rerun()
-                else:
-                    # Analiz var — tam paneli render et
-                    render_live_match(
-                        lm, live_stats, lp,
-                        st.session_state["live_analyses"][lid],
-                        ld["hf"], ld["af"], ld["h2h"]
-                    )
-                    # Yenile butonu
-                    if st.button("🔄 Analizi Güncelle", key=f"live_upd_{lid}"):
+                if done:
+                    atxt = st.session_state["live_analyses"][lid]
+
+                    # ŞİMDİ AL banner (maç içinde)
+                    pick = _extract_simdi_al(atxt)
+                    if pick and pick.get("market"):
+                        st.markdown(f"""
+<div style="background:#04180a;border:1px solid #3ecf7a;border-radius:8px;
+padding:.6rem 1rem;margin-bottom:.6rem;display:flex;align-items:center;gap:10px">
+  <span style="font-size:.56rem;font-weight:800;letter-spacing:.12em;color:#3ecf7a;
+  text-transform:uppercase">ŞİMDİ AL</span>
+  <span style="font-size:.9rem;font-weight:800;color:#d0dce8;
+  font-family:JetBrains Mono,monospace">{pick['market']}</span>
+  <span style="font-size:.68rem;color:#4a6880;flex:1">{pick.get('why','')}</span>
+</div>""", unsafe_allow_html=True)
+
+                    # Tam analiz paneli
+                    render_live_match(lm, live_stats, lp, atxt, ld["hf"], ld["af"], ld["h2h"])
+
+                    # Güncelle butonu
+                    if st.button("🔄 Güncelle", key=f"live_upd_{lid}", use_container_width=False):
                         with st.spinner("🦙 Güncelleniyor..."):
-                            prompt = build_live_prompt(
-                                lhn, lan, minute_int, lhsc, lasc, ht_h, ht_a,
-                                live_stats, lp, ld["hf"], ld["af"], ld["h2h"]
-                            )
+                            prompt = build_live_prompt(lhn, lan, minute_int, lhsc, lasc, ht_h, ht_a,
+                                                       live_stats, lp, ld["hf"], ld["af"], ld["h2h"])
                             st.session_state["live_analyses"][lid] = groq_call(prompt)
                         st.rerun()
+                else:
+                    # Analiz yok — özet istatistik + analiz butonu
+                    ca, cb = st.columns([4,1])
+                    with ca:
+                        st.caption(
+                            f"xG: {lhn} {live_stats.get('xg_h',0):.2f}–{live_stats.get('xg_a',0):.2f} {lan}  |  "
+                            f"Teh.Atak: {int(live_stats.get('dangerous_h',0))}–{int(live_stats.get('dangerous_a',0))}  |  "
+                            f"Bkl.Ek Gol: {lp['expected_remaining']}  |  "
+                            f"2.5 Üst: %{lp.get('o25',0)}"
+                        )
+                    with cb:
+                        if st.button("🤖 Analiz", key=f"live_btn_{lid}", type="primary", use_container_width=True):
+                            with st.spinner("🦙 Analiz ediliyor..."):
+                                prompt = build_live_prompt(lhn, lan, minute_int, lhsc, lasc, ht_h, ht_a,
+                                                           live_stats, lp, ld["hf"], ld["af"], ld["h2h"])
+                                st.session_state["live_analyses"][lid] = groq_call(prompt)
+                            st.rerun()
 
     if live_auto:
         time.sleep(58)
         st.rerun()
 
-    st.stop()  # Canlı modda normal maç akışını durdur
+    st.stop()
 
 # ══════════════════════════════════════════════════════════════════
 # KONTROLLER
