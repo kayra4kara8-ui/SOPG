@@ -3,12 +3,12 @@ import requests
 import math
 import time
 def _safe_minute(val, default=45):
-    """Parse a match minute safely — handles ?, empty, None, 45+2, etc."""
+    \"\"\"Parse a match minute safely — handles ?, empty, None, 45+2, etc.\"\"\"
     try:
-        s = str(val).replace("'","").strip()
-        # "45+2" → 47, "90+4" → 94
-        if "+" in s:
-            parts = s.split("+")
+        s = str(val).replace(\"'\",\"\").strip()
+        # \"45+2\" → 47, \"90+4\" → 94
+        if \"+\" in s:
+            parts = s.split(\"+\")
             return int(parts[0]) + int(parts[1])
         s = s.split()[0]
         return int(s) if s and s[0].isdigit() else default
@@ -16,23 +16,23 @@ def _safe_minute(val, default=45):
         return default
 
 def calc_live_minute(m):
-    """
+    \"\"\"
     football-data.org maç nesnesinden gerçek oyun dakikasını hesapla.
     utcDate UTC'dir. Devre arası ~15dk. Stopaj hesaba katılmaz.
-    """
+    \"\"\"
     import datetime as _dt
 
-    status = m.get("status", "")
-    if status == "PAUSED":
+    status = m.get(\"status\", \"\")
+    if status == \"PAUSED\":
         return 45
 
-    utc_str = m.get("utcDate", "")
+    utc_str = m.get(\"utcDate\", \"\")
     if not utc_str:
         return 45
 
     try:
-        clean = utc_str.rstrip("Z").replace("T", " ")[:19]
-        start = _dt.datetime.strptime(clean, "%Y-%m-%d %H:%M:%S")
+        clean = utc_str.rstrip(\"Z\").replace(\"T\", \" \")[:19]
+        start = _dt.datetime.strptime(clean, \"%Y-%m-%d %H:%M:%S\")
     except Exception:
         return 45
 
@@ -50,22 +50,22 @@ def calc_live_minute(m):
 
 from datetime import date
 
-st.set_page_config(page_title="⚽ BetAnalyst Pro", page_icon="⚽",
-                   layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title=\"⚽ BetAnalyst Pro\", page_icon=\"⚽\",
+                   layout=\"wide\", initial_sidebar_state=\"expanded\")
 
-FD_KEY          = "5cc88bf0dbac4fb699482886eb4c2270"
-AF_KEY_DEFAULT  = "b30caea6f2a4c305ff317308de0b917d"
-GROQ_KEY = "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"
-ODDS_API_KEY_DEFAULT = "4d4d08c88873623761e05df66d0aeb07"
+FD_KEY          = \"5cc88bf0dbac4fb699482886eb4c2270\"
+AF_KEY_DEFAULT  = \"b30caea6f2a4c305ff317308de0b917d\"
+GROQ_KEY = \"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\"
+ODDS_API_KEY_DEFAULT = \"4d4d08c88873623761e05df66d0aeb07\"
 
 # ══════════════════════════════════════════════════════════════════
 # CSS
 # ══════════════════════════════════════════════════════════════════
-st.markdown("""
+st.markdown(\"\"\"
 <style>
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap');
 *{box-sizing:border-box}
-html,body,[class*="css"]{font-family:'Inter',sans-serif}
+html,body,[class*=\"css\"]{font-family:'Inter',sans-serif}
 
 /* ── RENK SİSTEMİ ──────────────────────────────────────
   Arka plan L1:  #09101e   (en koyu — card içi)
@@ -419,251 +419,247 @@ html,body,[class*="css"]{font-family:'Inter',sans-serif}
 .live-updated{color:#3ecf7a;font-weight:600}
 
 /* Streamlit overrides */
-div[data-testid="stExpander"]{border:1px solid #1c2e44!important;border-radius:12px!important;background:#0d1829!important;overflow:hidden}
-div[data-testid="stExpander"] summary{background:#0d1829!important}
-.stTabs [data-baseweb="tab-list"]{background:#09101e;padding:3px;gap:3px;border-radius:7px}
-.stTabs [data-baseweb="tab"]{border-radius:5px;color:#4a6880;font-size:.74rem;padding:4px 11px}
-.stTabs [aria-selected="true"]{background:#111f35!important;color:#00e5a0!important}
-button[kind="primary"]{background:linear-gradient(90deg,#0ea5e9,#00e5a0)!important;
+div[data-testid=\"stExpander\"]{border:1px solid #1c2e44!important;border-radius:12px!important;background:#0d1829!important;overflow:hidden}
+div[data-testid=\"stExpander\"] summary{background:#0d1829!important}
+.stTabs [data-baseweb=\"tab-list\"]{background:#09101e;padding:3px;gap:3px;border-radius:7px}
+.stTabs [data-baseweb=\"tab\"]{border-radius:5px;color:#4a6880;font-size:.74rem;padding:4px 11px}
+.stTabs [aria-selected=\"true\"]{background:#111f35!important;color:#00e5a0!important}
+button[kind=\"primary\"]{background:linear-gradient(90deg,#0ea5e9,#00e5a0)!important;
 color:#06090f!important;font-weight:700!important;border:none!important;border-radius:7px!important}
 </style>
-""", unsafe_allow_html=True)
+\"\"\", unsafe_allow_html=True)
 
-st.markdown("""
-<div class="hero">
+st.markdown(\"\"\"
+<div class=\"hero\">
   <h1>⚽ Bet<span>Analyst</span> Pro</h1>
   <p>football-data.org · Groq Llama 3.3 70B · Profesyonel VS Analiz</p>
 </div>
-""", unsafe_allow_html=True)
+\"\"\", unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════════
 # SIDEBAR
 # ══════════════════════════════════════════════════════════════════
 with st.sidebar:
-    st.markdown("## ⚙️ Filtreler")
-    st.success("✅ API key'ler hazır")
+    st.markdown(\"## ⚙️ Filtreler\")
+    st.success(\"✅ API key'ler hazır\")
 
     # ── MOD SEÇİMİ ──
     app_mode = st.radio(
-        "Mod",
-        ["📅 Maç Analizi", "🔴 Canlı Maçlar"],
+        \"Mod\",
+        [\"📅 Maç Analizi\", \"🔴 Canlı Maçlar\"],
         horizontal=True,
-        help="Canlı modda oynanan maçları gerçek zamanlı analiz et"
+        help=\"Canlı modda oynanan maçları gerçek zamanlı analiz et\"
     )
 
     # ── Ücretsiz planda çalışan ligler (football-data.org) ──
-    # 2. ligler ücretli plan gerektirir (49€/ay) — sadece 1. ligler ücretsiz
     LEAGUE_GROUPS = {
-        "🌍 Avrupa Kulüp": {
-            "UEFA Champions League ⭐": "CL",
-            "UEFA Europa League":       "EL",
-            "UEFA Conference League":   "ECL",
+        \"🌍 Avrupa Kulüp\": {
+            \"UEFA Champions League ⭐\": \"CL\",
+            \"UEFA Europa League\":       \"EL\",
+            \"UEFA Conference League\":   \"ECL\",
         },
-        "🏴󠁧󠁢󠁥󠁮󠁧󠁿 İngiltere": {
-            "Premier League":           "PL",
-            "Championship (2. Lig) ✅": "ELC",  # İngiltere 2. ligi ücretsiz!
-            "FA Cup":                   "FAC",
+        \"🏴󠁧󠁢󠁥󠁮󠁧󠁿 İngiltere\": {
+            \"Premier League\":           \"PL\",
+            \"Championship (2. Lig) ✅\": \"ELC\",
+            \"FA Cup\":                   \"FAC\",
         },
-        "🇪🇸 İspanya": {
-            "La Liga":                  "PD",
+        \"🇪🇸 İspanya\": {
+            \"La Liga\":                  \"PD\",
         },
-        "🇩🇪 Almanya": {
-            "Bundesliga":               "BL1",
+        \"🇩🇪 Almanya\": {
+            \"Bundesliga\":               \"BL1\",
         },
-        "🇮🇹 İtalya": {
-            "Serie A":                  "SA",
+        \"🇮🇹 İtalya\": {
+            \"Serie A\":                  \"SA\",
         },
-        "🇫🇷 Fransa": {
-            "Ligue 1":                  "FL1",
+        \"🇫🇷 Fransa\": {
+            \"Ligue 1\":                  \"FL1\",
         },
-        "🇳🇱 Hollanda": {
-            "Eredivisie":               "DED",
+        \"🇳🇱 Hollanda\": {
+            \"Eredivisie\":               \"DED\",
         },
-        "🇵🇹 Portekiz": {
-            "Primeira Liga":            "PPL",
+        \"🇵🇹 Portekiz\": {
+            \"Primeira Liga\":            \"PPL\",
         },
-        "🇧🇷 Brezilya": {
-            "Série A":                  "BSA",
+        \"🇧🇷 Brezilya\": {
+            \"Série A\":                  \"BSA\",
         },
-        "🌐 Milli Takım": {
-            "FIFA World Cup":           "WC",
-            "UEFA Avrupa Şampiyonası":  "EC",
+        \"🌐 Milli Takım\": {
+            \"FIFA World Cup\":           \"WC\",
+            \"UEFA Avrupa Şampiyonası\":  \"EC\",
         },
     }
 
-    sel_group = st.selectbox("Kategori", list(LEAGUE_GROUPS.keys()))
-    sel_label = st.selectbox("Lig", list(LEAGUE_GROUPS[sel_group].keys()))
-    sel_code  = LEAGUE_GROUPS[sel_group][sel_label].split("#")[0].strip()
+    sel_group = st.selectbox(\"Kategori\", list(LEAGUE_GROUPS.keys()))
+    sel_label = st.selectbox(\"Lig\", list(LEAGUE_GROUPS[sel_group].keys()))
+    sel_code  = LEAGUE_GROUPS[sel_group][sel_label].split(\"#\")[0].strip()
 
     st.info(
-        "ℹ️ **2. ligler neden yok?**\n\n"
-        "football-data.org ücretsiz planda yalnızca belirli 1. ligler ve "
-        "İngiltere Championship dahil. 2. Bundesliga, Serie B, Ligue 2, "
-        "Segunda División vb. 49€/ay ücretli plan gerektiriyor. "
-        "Ücretsiz planda mevcut olan ligler yukarıda listelenmiştir."
+        \"ℹ️ **2. ligler neden yok?**\\n\\n\"
+        \"football-data.org ücretsiz planda yalnızca belirli 1. ligler ve \"
+        \"İngiltere Championship dahil. 2. Bundesliga, Serie B, Ligue 2, \"
+        \"Segunda División vb. 49€/ay ücretli plan gerektiriyor. \"
+        \"Ücretsiz planda mevcut olan ligler yukarıda listelenmiştir.\"
     )
-    sel_date  = st.date_input("Tarih", value=date.today())
-    max_match = st.slider("Maks Maç", 1, 15, 8)
-    n_form    = st.slider("Form Maç Sayısı", 5, 12, 8)
-    n_h2h     = st.slider("H2H Maç Sayısı", 4, 10, 6)
+    sel_date  = st.date_input(\"Tarih\", value=date.today())
+    max_match = st.slider(\"Maks Maç\", 1, 15, 8)
+    n_form    = st.slider(\"Form Maç Sayısı\", 5, 12, 8)
+    n_h2h     = st.slider(\"H2H Maç Sayısı\", 4, 10, 6)
     groq_model = st.selectbox(
-        "Groq Modeli",
+        \"Groq Modeli\",
         [
-            "llama-3.1-8b-instant",       # ⚡ En hızlı (önerilen)
-            "llama-3.3-70b-versatile",    # 🧠 En kaliteli (yavaş)
-            "llama3-70b-8192",            # 🧠 Kaliteli (yavaş)
+            \"llama-3.1-8b-instant\",
+            \"llama-3.3-70b-versatile\",
+            \"llama3-70b-8192\",
         ],
-        help="llama-3.1-8b-instant çok daha hızlı ve rate limit yok gibi. 70B daha derin analiz yapar ama yavaş."
+        help=\"llama-3.1-8b-instant çok daha hızlı ve rate limit yok gibi. 70B daha derin analiz yapar ama yavaş.\"
     )
-    debug     = st.checkbox("🐛 Debug", value=False)
+    debug     = st.checkbox(\"🐛 Debug\", value=False)
 
     st.divider()
-    st.markdown("### 💰 Oran Kaynakları")
+    st.markdown(\"### 💰 Oran Kaynakları\")
 
-    # ── The Odds API — key hardcoded ──
-    st.markdown("""<div style="background:#0d1829;border:1px solid #1c2e44;border-left:3px solid #00e5a0;
-border-radius:6px;padding:8px 10px;font-size:.73rem;color:#7a9ab8;line-height:1.4;margin-bottom:6px">
-<b style="color:#00e5a0">✅ The Odds API — AKTİF</b><br>
-<span style="color:#3ecf7a">Bet365 · Pinnacle · Unibet gerçek oranları</span>
-</div>""", unsafe_allow_html=True)
+    st.markdown(\"\"\"<div style=\"background:#0d1829;border:1px solid #1c2e44;border-left:3px solid #00e5a0;
+border-radius:6px;padding:8px 10px;font-size:.73rem;color:#7a9ab8;line-height:1.4;margin-bottom:6px\">
+<b style=\"color:#00e5a0\">✅ The Odds API — AKTİF</b><br>
+<span style=\"color:#3ecf7a\">Bet365 · Pinnacle · Unibet gerçek oranları</span>
+</div>\"\"\", unsafe_allow_html=True)
     odds_api_key = ODDS_API_KEY_DEFAULT
 
-    # ── API-Football (yedek) ──
-    with st.expander("⚙️ API-Football Key (yedek)", expanded=False):
-        st.caption("The Odds API bulamazsa fallback. Ücretsiz 100 istek/gün.")
+    with st.expander(\"⚙️ API-Football Key (yedek)\", expanded=False):
+        st.caption(\"The Odds API bulamazsa fallback. Ücretsiz 100 istek/gün.\")
         apifootball_key = st.text_input(
-            "API-Football Key",
+            \"API-Football Key\",
             value=AF_KEY_DEFAULT,
-            type="password",
-            placeholder="dashboard.api-football.com → API Key",
+            type=\"password\",
+            placeholder=\"dashboard.api-football.com → API Key\",
         )
     if 'apifootball_key' not in dir():
         apifootball_key = AF_KEY_DEFAULT
 
-    auto_odds = st.checkbox("✅ Oranları otomatik çek", value=True,
-        help="The Odds API → API-Football → fdco.uk CSV → model tahmini sırasıyla dener")
-    tolerance = st.slider("Oran Toleransı (±)", 0.10, 0.60, 0.30, 0.05,
-                           help="Geçmiş pattern aramasında kabul edilen oran farkı")
-    n_seasons = st.slider("Kaç Sezon Analiz Edilsin", 1, 5, 3)
+    auto_odds = st.checkbox(\"✅ Oranları otomatik çek\", value=True,
+        help=\"The Odds API → API-Football → fdco.uk CSV → model tahmini sırasıyla dener\")
+    tolerance = st.slider(\"Oran Toleransı (±)\", 0.10, 0.60, 0.30, 0.05,
+                           help=\"Geçmiş pattern aramasında kabul edilen oran farkı\")
+    n_seasons = st.slider(\"Kaç Sezon Analiz Edilsin\", 1, 5, 3)
     use_manual_odds = False
     manual_o1 = manual_ox = manual_o2 = None
-    with st.expander("✏️ Manuel Oran Giriş", expanded=False):
-        st.caption("Hiçbir kaynak çalışmazsa buraya gir")
-        manual_o1 = st.number_input("1 (Ev Kazanır)", min_value=1.01, max_value=30.0, value=2.0, step=0.01, format="%.2f")
-        manual_ox = st.number_input("X (Beraberlik)", min_value=1.01, max_value=30.0, value=3.20, step=0.01, format="%.2f")
-        manual_o2 = st.number_input("2 (Dep Kazanır)", min_value=1.01, max_value=30.0, value=3.80, step=0.01, format="%.2f")
-        use_manual_odds = st.checkbox("Bu oranları kullan", value=False)
+    with st.expander(\"✏️ Manuel Oran Giriş\", expanded=False):
+        st.caption(\"Hiçbir kaynak çalışmazsa buraya gir\")
+        manual_o1 = st.number_input(\"1 (Ev Kazanır)\", min_value=1.01, max_value=30.0, value=2.0, step=0.01, format=\"%.2f\")
+        manual_ox = st.number_input(\"X (Beraberlik)\", min_value=1.01, max_value=30.0, value=3.20, step=0.01, format=\"%.2f\")
+        manual_o2 = st.number_input(\"2 (Dep Kazanır)\", min_value=1.01, max_value=30.0, value=3.80, step=0.01, format=\"%.2f\")
+        use_manual_odds = st.checkbox(\"Bu oranları kullan\", value=False)
 
 # ══════════════════════════════════════════════════════════════════
 # API
 # ══════════════════════════════════════════════════════════════════
-BASE = "https://api.football-data.org/v4"
+BASE = \"https://api.football-data.org/v4\"
 
 def fd_get(path, params=None, _retries=3):
-    headers = {"X-Auth-Token": FD_KEY}
-    url     = f"{BASE}{path}"
+    headers = {\"X-Auth-Token\": FD_KEY}
+    url     = f\"{BASE}{path}\"
     for attempt in range(_retries):
         try:
             r = requests.get(url, headers=headers,
                              params=params or {},
-                             timeout=(8, 30))  # (connect, read) — read 30sn
+                             timeout=(8, 30))
             if r.status_code == 429:
                 wait = 66 if attempt == 0 else 10
                 ph = st.empty()
                 for i in range(wait, 0, -1):
-                    ph.warning(f"⏳ Rate limit — {i}sn bekleniyor...")
+                    ph.warning(f\"⏳ Rate limit — {i}sn bekleniyor...\")
                     time.sleep(1)
                 ph.empty()
                 continue
             if r.status_code == 200:
-                if debug: st.caption(f"🐛 {path} → 200")
+                if debug: st.caption(f\"🐛 {path} → 200\")
                 return r.json()
-            if debug: st.caption(f"🐛 {path} → {r.status_code}")
+            if debug: st.caption(f\"🐛 {path} → {r.status_code}\")
             return {}
         except requests.exceptions.ReadTimeout:
             if attempt < _retries - 1:
                 time.sleep(3 * (attempt + 1))
                 continue
-            st.warning(f"⚠️ Sunucu yanıt vermedi ({path}) — tekrar dene.")
+            st.warning(f\"⚠️ Sunucu yanıt vermedi ({path}) — tekrar dene.\")
             return {}
         except requests.exceptions.ConnectionError:
             if attempt < _retries - 1:
                 time.sleep(4)
                 continue
-            st.warning(f"⚠️ Bağlantı hatası ({path})")
+            st.warning(f\"⚠️ Bağlantı hatası ({path})\")
             return {}
         except Exception as e:
-            if debug: st.caption(f"🐛 fd_get {path}: {e}")
+            if debug: st.caption(f\"🐛 fd_get {path}: {e}\")
             return {}
     return {}
 
 def api_matches(code, dt, lim):
-    d = fd_get(f"/competitions/{code}/matches",
-               {"dateFrom": dt, "dateTo": dt, "status": "SCHEDULED,TIMED,POSTPONED"})
-    return d.get("matches", [])[:lim]
+    d = fd_get(f\"/competitions/{code}/matches\",
+               {\"dateFrom\": dt, \"dateTo\": dt, \"status\": \"SCHEDULED,TIMED,POSTPONED\"})
+    return d.get(\"matches\", [])[:lim]
 
 def api_team_matches(tid, n):
     data = fd_get(
-        f"/teams/{tid}/matches",
-        {"status": "FINISHED", "limit": n}
+        f\"/teams/{tid}/matches\",
+        {\"status\": \"FINISHED\", \"limit\": n}
     )
-    matches = data.get("matches", [])
-    # Tarihe göre azalan sırala — en yeni maç öne gelsin
-    matches.sort(key=lambda m: m.get("utcDate", ""), reverse=True)
+    matches = data.get(\"matches\", [])
+    matches.sort(key=lambda m: m.get(\"utcDate\", \"\"), reverse=True)
     return matches[:n]
 
 def api_h2h(mid, n):
-    data = fd_get(f"/matches/{mid}/head2head", {"limit": n})
-    matches = data.get("matches", [])
-    # Sadece biten maçları döndür, en yeni önce
-    finished = [m for m in matches if m.get("status") == "FINISHED"]
-    finished.sort(key=lambda m: m.get("utcDate", ""), reverse=True)
+    data = fd_get(f\"/matches/{mid}/head2head\", {\"limit\": n})
+    matches = data.get(\"matches\", [])
+    finished = [m for m in matches if m.get(\"status\") == \"FINISHED\"]
+    finished.sort(key=lambda m: m.get(\"utcDate\", \"\"), reverse=True)
     return finished[:n]
 
 def api_standings(code):
-    try: return fd_get(f"/competitions/{code}/standings")["standings"][0]["table"]
+    try: return fd_get(f\"/competitions/{code}/standings\")[\"standings\"][0][\"table\"]
     except: return []
 
 def api_scorers(code):
-    return fd_get(f"/competitions/{code}/scorers", {"limit": 20}).get("scorers", [])
+    return fd_get(f\"/competitions/{code}/scorers\", {\"limit\": 20}).get(\"scorers\", [])
+
+def find_standing(table, tid):
+    for row in table:
+        if row[\"team\"][\"id\"] == tid: return row
+    return {}
+    
+def find_scorer(scorers, tid):
+    for s in scorers:
+        if s[\"team\"][\"id\"] == tid: return s[\"player\"]
+    return {}
 
 # ── CANLI MAÇ API FONKSİYONLARI ──────────────────────────────────
 
 def api_live_matches(code=None):
-    """
-    Şu an oynanan canlı maçları çek — sıkı filtreleme ile.
-    Sadece status IN_PLAY veya PAUSED (devre arası) olanlar.
-    FINISHED, SUSPENDED, POSTPONED olanlar kesinlikle dışlanır.
-    """
     import datetime as _dt
 
-    LIVE_STATUSES = {"IN_PLAY", "PAUSED"}  # sadece bunlar canlı
+    LIVE_STATUSES = {\"IN_PLAY\", \"PAUSED\"}
 
-    params = {"status": "IN_PLAY,PAUSED"}
+    params = {\"status\": \"IN_PLAY,PAUSED\"}
     if code:
-        raw = fd_get(f"/competitions/{code}/matches", params).get("matches", [])
+        raw = fd_get(f\"/competitions/{code}/matches\", params).get(\"matches\", [])
     else:
-        raw = fd_get("/matches", params).get("matches", [])
+        raw = fd_get(\"/matches\", params).get(\"matches\", [])
 
     now_utc = _dt.datetime.utcnow()
     live = []
     for m in raw:
-        # 1. Status kontrolü — FINISHED olanları kesinlikle at
-        status = m.get("status", "")
+        status = m.get(\"status\", \"\")
         if status not in LIVE_STATUSES:
             continue
 
-        # 2. UTC saat kontrolü — bugün oynanıyor olmalı
-        utc_str = m.get("utcDate", "")
+        utc_str = m.get(\"utcDate\", \"\")
         if utc_str:
             try:
-                match_dt = _dt.datetime.strptime(utc_str[:16], "%Y-%m-%dT%H:%M")
-                # Maç saatinden 3 saat sonrasına kadar "canlı olabilir" kabul et
-                # (90 dakika + stopaj + olası uzatma)
+                match_dt = _dt.datetime.strptime(utc_str[:16], \"%Y-%m-%dT%H:%M\")
                 if match_dt > now_utc:
-                    continue  # Henüz başlamamış
+                    continue
                 if (now_utc - match_dt).total_seconds() > 3 * 3600:
-                    continue  # 3 saatten eski → bitmiş demektir
+                    continue
             except:
                 pass
 
@@ -672,24 +668,19 @@ def api_live_matches(code=None):
     return live
 
 def api_live_match_detail(match_id):
-    """Tek maçın detayını çek (skor, dakika, istatistik)."""
-    return fd_get(f"/matches/{match_id}")
+    return fd_get(f\"/matches/{match_id}\")
 
 @st.cache_data(ttl=60, show_spinner=False)
 def fetch_sofascore_live_stats(match_id_ss):
-    """
-    SofaScore'dan canlı maç istatistiklerini çek.
-    match_id_ss: SofaScore event ID
-    """
     try:
         headers = {
-            "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) "
-                          "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1",
-            "Accept": "application/json",
-            "Referer": "https://www.sofascore.com/",
+            \"User-Agent\": \"Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) \"
+                          \"AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1\",
+            \"Accept\": \"application/json\",
+            \"Referer\": \"https://www.sofascore.com/\",
         }
         r = requests.get(
-            f"https://api.sofascore.com/api/v1/event/{match_id_ss}/statistics",
+            f\"https://api.sofascore.com/api/v1/event/{match_id_ss}/statistics\",
             headers=headers, timeout=20
         )
         if r.status_code == 200:
@@ -700,38 +691,33 @@ def fetch_sofascore_live_stats(match_id_ss):
 
 @st.cache_data(ttl=60, show_spinner=False)
 def fetch_sofascore_live_event(h_name, a_name):
-    """
-    SofaScore'dan canlı maçı bul ve istatistikleri getir.
-    """
     try:
         headers = {
-            "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) "
-                          "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1",
-            "Accept": "application/json",
-            "Referer": "https://www.sofascore.com/",
+            \"User-Agent\": \"Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) \"
+                          \"AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1\",
+            \"Accept\": \"application/json\",
+            \"Referer\": \"https://www.sofascore.com/\",
         }
         from datetime import date as _date
-        today = _date.today().strftime("%Y-%m-%d")
+        today = _date.today().strftime(\"%Y-%m-%d\")
         r = requests.get(
-            f"https://api.sofascore.com/api/v1/sport/football/scheduled-events/{today}",
+            f\"https://api.sofascore.com/api/v1/sport/football/scheduled-events/{today}\",
             headers=headers, timeout=20
         )
         if r.status_code != 200:
             return None, None
 
-        events = r.json().get("events", [])
-        # Canlı maç bul
+        events = r.json().get(\"events\", [])
         for ev in events:
-            status = ev.get("status", {}).get("type", "")
-            if status not in ("inprogress", "halftime"):
+            status = ev.get(\"status\", {}).get(\"type\", \"\")
+            if status not in (\"inprogress\", \"halftime\"):
                 continue
-            gh = ev.get("homeTeam", {}).get("name", "")
-            ga = ev.get("awayTeam", {}).get("name", "")
+            gh = ev.get(\"homeTeam\", {}).get(\"name\", \"\")
+            ga = ev.get(\"awayTeam\", {}).get(\"name\", \"\")
             if fuzzy_match_team(gh, h_name) and fuzzy_match_team(ga, a_name):
-                ev_id = ev.get("id")
-                # İstatistikleri çek
+                ev_id = ev.get(\"id\")
                 r2 = requests.get(
-                    f"https://api.sofascore.com/api/v1/event/{ev_id}/statistics",
+                    f\"https://api.sofascore.com/api/v1/event/{ev_id}/statistics\",
                     headers=headers, timeout=20
                 )
                 stats_raw = r2.json() if r2.status_code == 200 else {}
@@ -742,60 +728,54 @@ def fetch_sofascore_live_event(h_name, a_name):
         return None, None
 
 def parse_live_stats(stats_raw):
-    """
-    SofaScore istatistik verisini işle.
-    Döndürür: dict with shots, possession, dangerous_attacks, xg, corners, cards vb.
-    """
     result = {
-        "possession_h": 50, "possession_a": 50,
-        "shots_h": 0, "shots_a": 0,
-        "shots_on_h": 0, "shots_on_a": 0,
-        "dangerous_h": 0, "dangerous_a": 0,
-        "corners_h": 0, "corners_a": 0,
-        "fouls_h": 0, "fouls_a": 0,
-        "yellow_h": 0, "yellow_a": 0,
-        "red_h": 0, "red_a": 0,
-        "xg_h": 0.0, "xg_a": 0.0,
-        "attacks_h": 0, "attacks_a": 0,
+        \"possession_h\": 50, \"possession_a\": 50,
+        \"shots_h\": 0, \"shots_a\": 0,
+        \"shots_on_h\": 0, \"shots_on_a\": 0,
+        \"dangerous_h\": 0, \"dangerous_a\": 0,
+        \"corners_h\": 0, \"corners_a\": 0,
+        \"fouls_h\": 0, \"fouls_a\": 0,
+        \"yellow_h\": 0, \"yellow_a\": 0,
+        \"red_h\": 0, \"red_a\": 0,
+        \"xg_h\": 0.0, \"xg_a\": 0.0,
+        \"attacks_h\": 0, \"attacks_a\": 0,
     }
     if not stats_raw:
         return result
 
     stat_map = {
-        "Ball possession": ("possession_h", "possession_a"),
-        "Total shots": ("shots_h", "shots_a"),
-        "Shots on target": ("shots_on_h", "shots_on_a"),
-        "Dangerous attacks": ("dangerous_h", "dangerous_a"),
-        "Corner kicks": ("corners_h", "corners_a"),
-        "Fouls": ("fouls_h", "fouls_a"),
-        "Yellow cards": ("yellow_h", "yellow_a"),
-        "Red cards": ("red_h", "red_a"),
-        "Expected goals": ("xg_h", "xg_a"),
-        "Attacks": ("attacks_h", "attacks_a"),
-        "Total Shots": ("shots_h", "shots_a"),
-        "Shots On Target": ("shots_on_h", "shots_on_a"),
+        \"Ball possession\": (\"possession_h\", \"possession_a\"),
+        \"Total shots\": (\"shots_h\", \"shots_a\"),
+        \"Shots on target\": (\"shots_on_h\", \"shots_on_a\"),
+        \"Dangerous attacks\": (\"dangerous_h\", \"dangerous_a\"),
+        \"Corner kicks\": (\"corners_h\", \"corners_a\"),
+        \"Fouls\": (\"fouls_h\", \"fouls_a\"),
+        \"Yellow cards\": (\"yellow_h\", \"yellow_a\"),
+        \"Red cards\": (\"red_h\", \"red_a\"),
+        \"Expected goals\": (\"xg_h\", \"xg_a\"),
+        \"Attacks\": (\"attacks_h\", \"attacks_a\"),
+        \"Total Shots\": (\"shots_h\", \"shots_a\"),
+        \"Shots On Target\": (\"shots_on_h\", \"shots_on_a\"),
     }
 
-    periods = stats_raw.get("statistics", [])
-    # Son period veya "ALL" period'u al
+    periods = stats_raw.get(\"statistics\", [])
     stat_list = []
     for p in periods:
-        if p.get("period") in ("ALL", "2ND", "1ST"):
-            stat_list = p.get("groups", [])
-            if p.get("period") == "ALL":
+        if p.get(\"period\") in (\"ALL\", \"2ND\", \"1ST\"):
+            stat_list = p.get(\"groups\", [])
+            if p.get(\"period\") == \"ALL\":
                 break
 
     for group in stat_list:
-        for item in group.get("statisticsItems", []):
-            name = item.get("name", "")
+        for item in group.get(\"statisticsItems\", []):
+            name = item.get(\"name\", \"\")
             if name in stat_map:
                 hk, ak = stat_map[name]
                 try:
-                    hv = item.get("home", "0")
-                    av = item.get("away", "0")
-                    # Yüzde işareti temizle
-                    hv = float(str(hv).replace("%","").strip() or 0)
-                    av = float(str(av).replace("%","").strip() or 0)
+                    hv = item.get(\"home\", \"0\")
+                    av = item.get(\"away\", \"0\")
+                    hv = float(str(hv).replace(\"%\",\"\").strip() or 0)
+                    av = float(str(av).replace(\"%\",\"\").strip() or 0)
                     result[hk] = hv
                     result[ak] = av
                 except:
@@ -803,44 +783,18 @@ def parse_live_stats(stats_raw):
     return result
 
 def calc_live_goal_probability(live_stats, minute, h_score, a_score, hf, af, league_code=None):
-    """
-    Canlı maç gol olasılığı — lig karakteri + dakika + xG + form birleşimi.
-
-    Lig gol ortalamaları (90dk/maç, her iki takım toplam):
-      Serie A: ~2.55  ← düşük, defansif
-      Ligue 1: ~2.60
-      La Liga: ~2.65
-      Premier League: ~2.80
-      Bundesliga: ~3.10  ← yüksek
-      Eredivisie: ~3.10
-      Default: ~2.70
-
-    Dakika hassasiyeti:
-      1-45  → 1Y devam
-      46-90 → 2Y devam
-      PAUSED (45) → devre arası
-    """
     import math as _math
 
     fv = lambda d, k, dv=0: d.get(k, dv) if d else dv
 
-    # ── Lig bazlı gol ortalaması ──────────────────────────────────
     LEAGUE_AVG = {
-        "SA":  2.55,   # Serie A
-        "FL1": 2.60,   # Ligue 1
-        "PD":  2.65,   # La Liga
-        "PPL": 2.65,   # Primeira Liga
-        "PL":  2.80,   # Premier League
-        "ELC": 2.75,   # Championship
-        "BL1": 3.10,   # Bundesliga
-        "DED": 3.10,   # Eredivisie
-        "CL":  2.80,
-        "EL":  2.75,
-        "BSA": 2.50,
+        \"SA\":  2.55, \"FL1\": 2.60, \"PD\":  2.65,
+        \"PPL\": 2.65, \"PL\":  2.80, \"ELC\": 2.75,
+        \"BL1\": 3.10, \"DED\": 3.10, \"CL\":  2.80,
+        \"EL\":  2.75, \"BSA\": 2.50,
     }
     league_avg = LEAGUE_AVG.get(league_code, 2.70)
 
-    # ── Süre tespiti ──────────────────────────────────────────────
     elapsed       = max(1, minute)
     is_first_half = elapsed <= 45
     ht_remaining  = max(0, 47 - elapsed) if is_first_half else 0
@@ -849,57 +803,46 @@ def calc_live_goal_probability(live_stats, minute, h_score, a_score, hf, af, lea
     ht_rem_frac   = ht_remaining / 45.0
     total_goals   = h_score + a_score
 
-    # ── Form bazlı beklenti (normalize lig ortalamasına göre) ─────
-    form_avg_gf_h = fv(hf, "avg_gf", league_avg * 0.5)
-    form_avg_gf_a = fv(af, "avg_gf", league_avg * 0.5)
-    # Düşük skorlu ligde form verisi de düşük olacak — lig ort ile kontrol et
+    form_avg_gf_h = fv(hf, \"avg_gf\", league_avg * 0.5)
+    form_avg_gf_a = fv(af, \"avg_gf\", league_avg * 0.5)
     form_rate_raw = form_avg_gf_h + form_avg_gf_a
-    # Aşırı sapmaları normalize et: formun lig ortalamasına max %40 sapmasına izin ver
     form_rate = max(league_avg * 0.6, min(league_avg * 1.4, form_rate_raw))
 
-    ht_form_h = fv(hf, "ht_avg_gf", form_avg_gf_h * 0.42)
-    ht_form_a = fv(af, "ht_avg_gf", form_avg_gf_a * 0.42)
+    ht_form_h = fv(hf, \"ht_avg_gf\", form_avg_gf_h * 0.42)
+    ht_form_a = fv(af, \"ht_avg_gf\", form_avg_gf_a * 0.42)
     ht_form_rate = ht_form_h + ht_form_a
 
-    # ── Canlı xG hızı ─────────────────────────────────────────────
-    live_xg_h     = live_stats.get("xg_h", 0) or 0
-    live_xg_a     = live_stats.get("xg_a", 0) or 0
+    live_xg_h     = live_stats.get(\"xg_h\", 0) or 0
+    live_xg_a     = live_stats.get(\"xg_a\", 0) or 0
     live_xg_total = live_xg_h + live_xg_a
 
     if live_xg_total > 0.05 and elapsed > 8:
         live_xg_rate = (live_xg_total / elapsed * 90)
-        # xG'yi lig ortalamasıyla da kıyasla — aşırı yüksek xG'yi kırp
         live_xg_rate = min(live_xg_rate, league_avg * 1.8)
-        # Ağırlıklı: canlı xG %50 + form %30 + lig ort %20
         xg_rate = live_xg_rate * 0.50 + form_rate * 0.30 + league_avg * 0.20
     elif total_goals > 0 and elapsed > 10:
         goal_rate_live = total_goals / elapsed * 90
         xg_rate = goal_rate_live * 0.35 + form_rate * 0.40 + league_avg * 0.25
     else:
-        # Maç yeni başladı ya da veri yok — form + lig ağırlıklı
         xg_rate = form_rate * 0.55 + league_avg * 0.45
 
-    # ── Tehlikeli atak + şut isabeti düzeltmesi ───────────────────
-    dan_h      = live_stats.get("dangerous_h", 0) or 0
-    dan_a      = live_stats.get("dangerous_a", 0) or 0
-    shots_h    = live_stats.get("shots_h", 0) or 0
-    shots_on_h = live_stats.get("shots_on_h", 0) or 0
-    shots_a    = live_stats.get("shots_a", 0) or 0
-    shots_on_a = live_stats.get("shots_on_a", 0) or 0
+    dan_h      = live_stats.get(\"dangerous_h\", 0) or 0
+    dan_a      = live_stats.get(\"dangerous_a\", 0) or 0
+    shots_h    = live_stats.get(\"shots_h\", 0) or 0
+    shots_on_h = live_stats.get(\"shots_on_h\", 0) or 0
+    shots_a    = live_stats.get(\"shots_a\", 0) or 0
+    shots_on_a = live_stats.get(\"shots_on_a\", 0) or 0
 
     dan_total = dan_h + dan_a
     if dan_total > 0 and elapsed > 5:
         dan_rate = dan_total / elapsed
-        # Lig karakterine göre eşik: düşük gol liginde atak/gol dönüşüm oranı düşük
         dan_threshold = 0.35 if league_avg < 2.65 else 0.28
         dan_multiplier = min(1.35, 1.0 + max(0, (dan_rate - dan_threshold)) * 0.4)
     else:
         dan_multiplier = 1.0
 
-    # Şut isabeti — yalnızca anlamlı örneklem varsa kullan
     if shots_h + shots_a >= 4:
         shot_acc = (shots_on_h + shots_on_a) / (shots_h + shots_a)
-        # Beklenen isabetlilik ~%35; düşük ligde daha düşük (~%30)
         expected_acc = 0.30 if league_avg < 2.65 else 0.35
         shot_mult = min(1.15, 0.92 + (shot_acc - expected_acc) * 0.8)
     else:
@@ -907,11 +850,9 @@ def calc_live_goal_probability(live_stats, minute, h_score, a_score, hf, af, lea
 
     combined_mult = min(1.45, dan_multiplier * shot_mult)
 
-    # ── Kalan süre için beklenen goller ───────────────────────────
     expected_ms = max(0.05, xg_rate * rem_frac * combined_mult)
     expected_ht = max(0.02, ht_form_rate * ht_rem_frac * combined_mult) if is_first_half and ht_remaining > 0 else 0.0
 
-    # Bireysel takım beklentisi
     if live_xg_h > 0.03 and elapsed > 8:
         exp_h_rate = (live_xg_h / elapsed * 90) * 0.5 + form_avg_gf_h * 0.3 + league_avg * 0.2 * 0.5
         exp_a_rate = (live_xg_a / elapsed * 90) * 0.5 + form_avg_gf_a * 0.3 + league_avg * 0.2 * 0.5
@@ -921,10 +862,9 @@ def calc_live_goal_probability(live_stats, minute, h_score, a_score, hf, af, lea
 
     exp_h_rem = max(0.02, exp_h_rate * rem_frac * combined_mult)
     exp_a_rem = max(0.02, exp_a_rate * rem_frac * combined_mult)
-    exp_h_ht  = max(0.01, fv(hf, "ht_avg_gf", exp_h_rate * 0.42) * ht_rem_frac * combined_mult)
-    exp_a_ht  = max(0.01, fv(af, "ht_avg_gf", exp_a_rate * 0.42) * ht_rem_frac * combined_mult)
+    exp_h_ht  = max(0.01, fv(hf, \"ht_avg_gf\", exp_h_rate * 0.42) * ht_rem_frac * combined_mult)
+    exp_a_ht  = max(0.01, fv(af, \"ht_avg_gf\", exp_a_rate * 0.42) * ht_rem_frac * combined_mult)
 
-    # ── Poisson yardımcı ──────────────────────────────────────────
     def poi(lam, k):
         lam = max(0.001, lam)
         return _math.exp(-lam) * (lam ** k) / _math.factorial(k)
@@ -932,45 +872,42 @@ def calc_live_goal_probability(live_stats, minute, h_score, a_score, hf, af, lea
     def p_at_least(lam, n):
         return max(0.0, 1 - sum(poi(lam, k) for k in range(int(n))))
 
-    # ── MS pazar olasılıkları ─────────────────────────────────────
     cur = total_goals
     market_probs = {}
     for thr in [1.5, 2.5, 3.5, 4.5]:
         needed = thr - cur
         if needed <= 0:
-            market_probs[f"o{int(thr*10)}"] = 99.0
-            market_probs[f"u{int(thr*10)}"] = 1.0
+            market_probs[f\"o{int(thr*10)}\"] = 99.0
+            market_probs[f\"u{int(thr*10)}\"] = 1.0
         else:
             p_over = round(p_at_least(expected_ms, needed) * 100, 1)
-            market_probs[f"o{int(thr*10)}"] = p_over
-            market_probs[f"u{int(thr*10)}"] = round(100 - p_over, 1)
+            market_probs[f\"o{int(thr*10)}\"] = p_over
+            market_probs[f\"u{int(thr*10)}\"] = round(100 - p_over, 1)
 
-    # ── İY pazar olasılıkları ─────────────────────────────────────
     ht_market = {}
     if is_first_half and ht_remaining > 0:
         for thr in [0.5, 1.5, 2.5]:
             needed = thr - total_goals
             if needed <= 0:
-                ht_market[f"ht_o{int(thr*10)}"] = 99.0
-                ht_market[f"ht_u{int(thr*10)}"] = 1.0
+                ht_market[f\"ht_o{int(thr*10)}\"] = 99.0
+                ht_market[f\"ht_u{int(thr*10)}\"] = 1.0
             else:
                 p_over = round(p_at_least(expected_ht, needed) * 100, 1)
-                ht_market[f"ht_o{int(thr*10)}"] = p_over
-                ht_market[f"ht_u{int(thr*10)}"] = round(100 - p_over, 1)
+                ht_market[f\"ht_o{int(thr*10)}\"] = p_over
+                ht_market[f\"ht_u{int(thr*10)}\"] = round(100 - p_over, 1)
 
         if h_score > 0 and a_score > 0:
-            ht_market["ht_kg_var"] = 99.0
+            ht_market[\"ht_kg_var\"] = 99.0
         elif h_score > 0:
-            ht_market["ht_kg_var"] = round(p_at_least(exp_a_ht, 1) * 100, 1)
+            ht_market[\"ht_kg_var\"] = round(p_at_least(exp_a_ht, 1) * 100, 1)
         elif a_score > 0:
-            ht_market["ht_kg_var"] = round(p_at_least(exp_h_ht, 1) * 100, 1)
+            ht_market[\"ht_kg_var\"] = round(p_at_least(exp_h_ht, 1) * 100, 1)
         else:
-            ht_market["ht_kg_var"] = round(p_at_least(exp_h_ht, 1) * p_at_least(exp_a_ht, 1) * 100, 1)
+            ht_market[\"ht_kg_var\"] = round(p_at_least(exp_h_ht, 1) * p_at_least(exp_a_ht, 1) * 100, 1)
 
-        ht_market["ht_next_h"] = round(p_at_least(exp_h_ht, 1) * 100, 1)
-        ht_market["ht_next_a"] = round(p_at_least(exp_a_ht, 1) * 100, 1)
+        ht_market[\"ht_next_h\"] = round(p_at_least(exp_h_ht, 1) * 100, 1)
+        ht_market[\"ht_next_a\"] = round(p_at_least(exp_a_ht, 1) * 100, 1)
 
-    # ── MS KG VAR ─────────────────────────────────────────────────
     if h_score > 0 and a_score > 0:
         p_kg_var = 99.0
     elif h_score > 0:
@@ -980,45 +917,40 @@ def calc_live_goal_probability(live_stats, minute, h_score, a_score, hf, af, lea
     else:
         p_kg_var = round(p_at_least(exp_h_rem, 1) * p_at_least(exp_a_rem, 1) * 100, 1)
 
-    # ── Momentum ──────────────────────────────────────────────────
     total_attacks = dan_h + dan_a + shots_h + shots_a
     momentum_h = max(0, min(100, round((dan_h + shots_on_h * 1.5) / max(1, dan_h + dan_a + shots_on_h + shots_on_a) * 100))) if total_attacks > 0 else 50
 
     return {
-        "elapsed":            elapsed,
-        "remaining_min":      ms_remaining,
-        "ht_remaining_min":   ht_remaining,
-        "is_first_half":      is_first_half,
-        "expected_remaining": round(expected_ms, 2),
-        "expected_ht":        round(expected_ht, 2),
-        "xg_rate_per90":      round(xg_rate, 2),
-        "league_avg":         league_avg,
-        "p_next_goal":        round(p_at_least(expected_ms, 1) * 100, 1),
-        "p_next_h":           round(p_at_least(exp_h_rem, 1) * 100, 1),
-        "p_next_a":           round(p_at_least(exp_a_rem, 1) * 100, 1),
-        "p_kg_var":           p_kg_var,
-        "momentum_h":         momentum_h,
-        "dan_multiplier":     round(combined_mult, 2),
+        \"elapsed\":            elapsed,
+        \"remaining_min\":      ms_remaining,
+        \"ht_remaining_min\":   ht_remaining,
+        \"is_first_half\":      is_first_half,
+        \"expected_remaining\": round(expected_ms, 2),
+        \"expected_ht\":        round(expected_ht, 2),
+        \"xg_rate_per90\":      round(xg_rate, 2),
+        \"league_avg\":         league_avg,
+        \"p_next_goal\":        round(p_at_least(expected_ms, 1) * 100, 1),
+        \"p_next_h\":           round(p_at_least(exp_h_rem, 1) * 100, 1),
+        \"p_next_a\":           round(p_at_least(exp_a_rem, 1) * 100, 1),
+        \"p_kg_var\":           p_kg_var,
+        \"momentum_h\":         momentum_h,
+        \"dan_multiplier\":     round(combined_mult, 2),
         **market_probs,
         **ht_market,
     }
 
 def build_live_prompt(h, a, minute, h_score, a_score, ht_h, ht_a,
                       live_stats, lp, hf, af, h2h):
-    """
-    Canlı maç — İY + MS gol bahsi odaklı profesyonel Groq prompt.
-    """
     fv = lambda d, k, dv=0: d.get(k, dv) if d else dv
 
-    is_ht = lp.get("is_first_half", minute <= 45)
-    ht_rem = lp.get("ht_remaining_min", 0)
-    ms_rem = lp.get("remaining_min", 0)
+    is_ht = lp.get(\"is_first_half\", minute <= 45)
+    ht_rem = lp.get(\"ht_remaining_min\", 0)
+    ms_rem = lp.get(\"remaining_min\", 0)
 
-    # ── Stat bloğu ────────────────────────────────────────────────
-    league_desc = {"SA":"Serie A (düşük gol ligi, ort 2.55/maç)","FL1":"Ligue 1 (düşük gol ligi, ort 2.60/maç)","PD":"La Liga (ort 2.65/maç)","BL1":"Bundesliga (yüksek gol ligi, ort 3.10/maç)","DED":"Eredivisie (yüksek gol ligi, ort 3.10/maç)","PL":"Premier League (ort 2.80/maç)"}.get(live_league if "live_league" in dir() else "", f"Lig ort: {lp.get('league_avg',2.70):.2f} gol/maç")
-    stat_block = f"""CANLI İSTATİSTİKLER — Dakika {minute}:
+    league_desc = {\"SA\":\"Serie A (düşük gol ligi, ort 2.55/maç)\",\"FL1\":\"Ligue 1 (düşük gol ligi, ort 2.60/maç)\",\"PD\":\"La Liga (ort 2.65/maç)\",\"BL1\":\"Bundesliga (yüksek gol ligi, ort 3.10/maç)\",\"DED\":\"Eredivisie (yüksek gol ligi, ort 3.10/maç)\",\"PL\":\"Premier League (ort 2.80/maç)\"}.get(live_league if \"live_league\" in dir() else \"\", f\"Lig ort: {lp.get('league_avg',2.70):.2f} gol/maç\")
+    stat_block = f\"\"\"CANLI İSTATİSTİKLER — Dakika {minute}:
   LİG KARAKTERİ: {league_desc}
-  Skor: {h} {h_score} – {a_score} {a}{"  (1. Yarı)" if is_ht else "  (2. Yarı / İY: " + str(ht_h) + "-" + str(ht_a) + ")"}
+  Skor: {h} {h_score} – {a_score} {a}{\"  (1. Yarı)\" if is_ht else \"  (2. Yarı / İY: \" + str(ht_h) + \"-\" + str(ht_a) + \")\"}
   Top Kontrolü: %{live_stats.get('possession_h',50)} EV — %{live_stats.get('possession_a',50)} DEP
   Şut (İsabetli): {int(live_stats.get('shots_h',0))} ({int(live_stats.get('shots_on_h',0))}) EV — {int(live_stats.get('shots_on_a',0))} ({int(live_stats.get('shots_a',0))}) DEP
   Tehlikeli Atak: {int(live_stats.get('dangerous_h',0))} EV — {int(live_stats.get('dangerous_a',0))} DEP
@@ -1026,12 +958,11 @@ def build_live_prompt(h, a, minute, h_score, a_score, ht_h, ht_a,
   Korner: {int(live_stats.get('corners_h',0))} EV — {int(live_stats.get('corners_a',0))} DEP
   Sarı Kart: {int(live_stats.get('yellow_h',0))} EV — {int(live_stats.get('yellow_a',0))} DEP
   Momentum Skoru (0=dep baskısı, 100=ev baskısı): {lp.get('momentum_h',50)}/100
-  Atak Çarpanı: x{lp.get('dan_multiplier',1.0)}"""
+  Atak Çarpanı: x{lp.get('dan_multiplier',1.0)}\"\"\"
 
-    # ── İY olasılık bloğu (sadece 1. yarıda) ─────────────────────
-    ht_block = ""
+    ht_block = \"\"
     if is_ht and ht_rem > 0:
-        ht_block = f"""
+        ht_block = f\"\"\"
 İLK YARI KALAN SÜRE ({ht_rem} dk kaldı):
   İY Mevcut Gol: {h_score + a_score} | Beklenen Ek İY Gol: {lp.get('expected_ht', 0)}
   İY 0.5 ÜST: %{lp.get('ht_o5', 0)} | İY 0.5 ALT: %{lp.get('ht_u5', 0)}
@@ -1040,19 +971,17 @@ def build_live_prompt(h, a, minute, h_score, a_score, ht_h, ht_a,
   İY KG VAR: %{lp.get('ht_kg_var', 0)}
   Sonraki İY Gol EV: %{lp.get('ht_next_h', 0)} | Sonraki İY Gol DEP: %{lp.get('ht_next_a', 0)}
   Tarihsel: {h} İY ort gol {fv(hf,'ht_avg_gf',0)} | {a} İY ort gol {fv(af,'ht_avg_gf',0)}
-  H2H İY: {h2h.get('ht_hw',0)}G-{h2h.get('ht_dr',0)}B-{h2h.get('ht_aw',0)}M"""
+  H2H İY: {h2h.get('ht_hw',0)}G-{h2h.get('ht_dr',0)}B-{h2h.get('ht_aw',0)}M\"\"\"
 
-    # ── MS olasılık bloğu ─────────────────────────────────────────
-    ms_block = f"""
+    ms_block = f\"\"\"
 MAÇ SONU ({ms_rem} dk kaldı):
   Beklenen Ek Gol: {lp.get('expected_remaining', 0)} | Sonraki Gol: %{lp.get('p_next_goal', 0)}
   Sonraki Gol EV: %{lp.get('p_next_h', 0)} | Sonraki Gol DEP: %{lp.get('p_next_a', 0)}
   1.5 ÜST: %{lp.get('o15', 0)} | 2.5 ÜST: %{lp.get('o25', 0)} | 3.5 ÜST: %{lp.get('o35', 0)}
   2.5 ALT: %{lp.get('u25', 0)} | 3.5 ALT: %{lp.get('u35', 0)}
-  KG VAR: %{lp.get('p_kg_var', 0)}"""
+  KG VAR: %{lp.get('p_kg_var', 0)}\"\"\"
 
-    # ── Form bloğu ────────────────────────────────────────────────
-    form_block = f"""
+    form_block = f\"\"\"
 TARİHSEL FORM:
   {h}: {fv(hf,'form_str','?')} | Ort gol: {fv(hf,'avg_gf',0)} att/{fv(hf,'avg_gc',0)} yedi
      İY ort: {fv(hf,'ht_avg_gf',0)} att/{fv(hf,'ht_avg_gc',0)} yedi | 2Y ort: {fv(hf,'st_avg_gf',0)}/{fv(hf,'st_avg_gc',0)}
@@ -1061,21 +990,19 @@ TARİHSEL FORM:
      İY ort: {fv(af,'ht_avg_gf',0)} att/{fv(af,'ht_avg_gc',0)} yedi | 2Y ort: {fv(af,'st_avg_gf',0)}/{fv(af,'st_avg_gc',0)}
      2.5 Üst: {fv(af,'o25',0)}/{fv(af,'n',1)} maç | KG VAR: {fv(af,'btts',0)}/{fv(af,'n',1)}
   H2H: Ort {h2h.get('avg_goals',0)} gol/maç | 2.5 Üst %{h2h.get('o25_pct',0)} | KG VAR %{h2h.get('btts_pct',0)}
-     Son İY Skorları: {' '.join(h2h.get('ht_scores',[])[:4])}"""
+     Son İY Skorları: {' '.join(h2h.get('ht_scores',[])[:4])}\"\"\"
 
-    # ── Prompt ───────────────────────────────────────────────────
-    iy_section = f"""
+    iy_section = f\"\"\"
 ### 2. İLK YARI GOL ANALİZİ
-{f"İY {ht_rem} dakika kaldı — mevcut: {h_score}-{a_score}" if is_ht and ht_rem > 0 else "İLK YARI TAMAMLANDI — İY skoru: " + str(ht_h) + "-" + str(ht_a)}
-{"[Yukarıdaki İY olasılık sayılarını kullan. Kalan süre EXACTLY " + str(ht_rem) + " dakika. Skor " + str(h_score) + "-" + str(a_score) + ". Bu sayıları değiştirme. İY 0.5 Üst/Alt için net karar ver.]" if is_ht and ht_rem > 0 else "[İY skoru " + str(ht_h) + "-" + str(ht_a) + ". 2. yarıda gol beklentisini değerlendir.]"}
+{f\"İY {ht_rem} dakika kaldı — mevcut: {h_score}-{a_score}\" if is_ht and ht_rem > 0 else \"İLK YARI TAMAMLANDI — İY skoru: \" + str(ht_h) + \"-\" + str(ht_a)}
+{\"[Yukarıdaki İY olasılık sayılarını kullan. Kalan süre EXACTLY \" + str(ht_rem) + \" dakika. Skor \" + str(h_score) + \"-\" + str(a_score) + \". Bu sayıları değiştirme. İY 0.5 Üst/Alt için net karar ver.]\" if is_ht and ht_rem > 0 else \"[İY skoru \" + str(ht_h) + \"-\" + str(ht_a) + \". 2. yarıda gol beklentisini değerlendir.]\"}
 
 İY BAHİS TAVSİYESİ:
-{("IY_BAHSI_1: [pazar adı — ör: İY 0.5 Alt veya İY 1.5 Alt veya İY KG YOK — ZATEN OLAN PAZARLARI ÖNERME] — [gerekçe] — GÜVENİLİRLİK: [YÜKSEK/ORTA/DÜŞÜK]" if is_ht and ht_rem > 0 else "IY_BAHSI_1: İY tamamlandı")}
-{"IY_BAHSI_2: [pazar adı] — [gerekçe] — GÜVENİLİRLİK: [YÜKSEK/ORTA/DÜŞÜK]" if is_ht and ht_rem > 0 else ""}""" if is_ht else f"""
+{(\"IY_BAHSI_1: [pazar adı — ör: İY 0.5 Alt veya İY 1.5 Alt veya İY KG YOK — ZATEN OLAN PAZARLARI ÖNERME] — [gerekçe] — GÜVENİLİRLİK: [YÜKSEK/ORTA/DÜŞÜK]\" if is_ht and ht_rem > 0 else \"IY_BAHSI_1: İY tamamlandı\")}
+{\"IY_BAHSI_2: [pazar adı] — [gerekçe] — GÜVENİLİRLİK: [YÜKSEK/ORTA/DÜŞÜK]\" if is_ht and ht_rem > 0 else \"\"}\"\"\" if is_ht else f\"\"\"
 ### 2. İLK YARI SONUCU
 İY skoru: {ht_h}-{ht_a} (EV {ht_h}, DEP {ht_a})
-[İY sonucunun 2Y gol beklentisine etkisi — hangi takım 2Y'da daha fazla gol arar, neden?]"""
-
+[İY sonucunun 2Y gol beklentisine etkisi — hangi takım 2Y'da daha fazla gol arar, neden?]\
     return f"""Sen bir profesyonel canlı bahis analistisin. Türkçe yaz. Her cümle bu maça özgü olmalı — jenerik yorum yasak.
 
 KRİTİK KURALLAR:
@@ -1119,7 +1046,6 @@ GEÇME: [kaçınılacak pazar] — [neden riskli — max 12 kelime]"""
 # ══════════════════════════════════════════════════════════════════
 
 def _calc_score_freq(score_pairs):
-    """Skor listesinden frekans sözlüğü çıkar — {(h,a): count}"""
     from collections import Counter
     c = Counter(score_pairs)
     total = sum(c.values())
@@ -1134,23 +1060,19 @@ def parse_form(matches, tid):
     h_gf = h_gc = h_n = a_gf = a_gc = a_n = 0
  
     for m in matches:
-        # Status kontrolü — sadece biten maçları işle
         if m.get("status") != "FINISHED":
             continue
  
         hid = m["homeTeam"]["id"]
  
-        # fullTime — None guard
         ft   = m.get("score", {}).get("fullTime") or {}
         fh   = ft.get("home") or 0
         fa   = ft.get("away") or 0
  
-        # halfTime — None guard (fix: None olduğunda 0 kullan)
         ht_score = m.get("score", {}).get("halfTime") or {}
         hh = ht_score.get("home") or 0
         ha = ht_score.get("away") or 0
  
-        # None → int dönüşümü
         fh = int(fh); fa = int(fa)
         hh = int(hh); ha = int(ha)
  
@@ -1207,11 +1129,6 @@ def parse_form(matches, tid):
     }
 
 def parse_h2h(matches, home_id):
-    """
-    home_id: mevcut maçın ev sahibi takım ID'si.
-    H2H maçlarında bu takım bazen ev, bazen deplasman olabilir.
-    Her maçta home_id'nin bakış açısından skor hesaplanır.
-    """
     if not matches:
         return {}
  
@@ -1233,7 +1150,6 @@ def parse_h2h(matches, home_id):
         hh = int(ht_score.get("home") or 0)
         ha = int(ht_score.get("away") or 0)
  
-        # home_id bu maçta ev sahibi mi deplasman mı?
         if hid == home_id:
             my_f, op_f, my_h, op_h = fh, fa, hh, ha
         else:
@@ -1247,7 +1163,6 @@ def parse_h2h(matches, home_id):
         elif my_h < op_h: ht_aw += 1
         else:             ht_dr += 1
  
-        # Dönüş tipleri
         if my_h < op_h and my_f > op_f: rev21 += 1
         if my_h > op_h and my_f < op_f: rev12 += 1
         if my_h == op_h and my_f > op_f: revx1 += 1
@@ -1332,30 +1247,16 @@ def compute_stats(ms_mat, ht_mat):
 
 
 # ══════════════════════════════════════════════════════════════════
-# ODDS MODÜLÜ — Mevcut kodu bozmaz, sadece ekler
-# Kaynak: football-data.co.uk (ücretsiz CSV) veya Manuel giriş
+# ODDS MODÜLÜ
 # ══════════════════════════════════════════════════════════════════
-
-
-
-# ─── ORAN-SKOR PATTERN MOTORu ─────────────────────────────────────
-# football-data.co.uk CSV'lerinden oran + İY/MS skor geçmişi çeker.
-# Soruya cevap: "Bu oran aralığında tarihte hangi skorlar çıkmış?"
-
-
-# ── OTOMATİK ORAN ÇEKME ──────────────────────────────────────────
-# football-data.co.uk fixtures.csv → açık maçların güncel oranları
-# Sezon CSV → geçmiş maç oranları + sonuçları
 
 FDCOUK_FIXTURE_URL = "https://www.football-data.co.uk/fixtures.csv"
 
-# Lig kodu: football-data.org → football-data.co.uk
 FD_ORG_TO_COUK = {
     "PL":"E0","ELC":"E1","PD":"SP1","BL1":"D1",
     "SA":"I1","FL1":"F1","DED":"N1","PPL":"P1",
 }
 
-# Lig kodu: football-data.org → The Odds API sport key
 FD_ORG_TO_ODDSAPI = {
     "PL":  "soccer_epl",
     "ELC": "soccer_efl_champ",
@@ -1377,14 +1278,6 @@ SEASON_CODES = ["2526","2425","2324","2223","2122","2021"]
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def fetch_fixtures_with_odds(couk_code):
-    """
-    football-data.co.uk'tan oranları çek — KEY YOK, KAYIT YOK.
-    Strateji:
-      1. fixtures.csv → bu hafta + gelecek hafta açık maçlar
-      2. 2526/COUK.csv  → güncel sezon, oynanmamış satırlar (FTHG boş)
-      3. 2425/COUK.csv  → geçen sezon fallback
-    Her kaynakta oran sütunları: AvgH/D/A > B365H/D/A > PSH/D/A
-    """
     import io, csv as _csv
 
     def fetch_text(url):
@@ -1400,7 +1293,6 @@ def fetch_fixtures_with_odds(couk_code):
             return []
 
     def extract_odds(rows, require_div=None):
-        """Satırlardan oran dict'i çıkar. FTHG boşsa oynanmamış demektir. Öncelik: B365 > Avg > PS > IW > VC"""
         out = {}
         for row in rows:
             if require_div and row.get("Div","").strip() != require_div:
@@ -1409,17 +1301,14 @@ def fetch_fixtures_with_odds(couk_code):
             away = row.get("AwayTeam","").strip()
             if not home or not away:
                 continue
-            # Oynanmış maçları geç (FTHG dolu)
             fthg = row.get("FTHG","").strip()
             if fthg not in ("","?","-"):
                 continue
-            # Oran kaynağı önceliği: B365 → Avg → PS → IW → VC
             def pick(*keys):
                 for k in keys:
                     v = _safe_float(row.get(k,""))
                     if v and v > 1.0: return v
                 return None
-            # B365 önce
             o1  = pick("B365H","AvgH","PSH","IWH","VCH","WHH")
             ox  = pick("B365D","AvgD","PSD","IWD","VCD","WHD")
             o2  = pick("B365A","AvgA","PSA","IWA","VCA","WHA")
@@ -1427,7 +1316,6 @@ def fetch_fixtures_with_odds(couk_code):
                 continue
             o25 = pick("B365>2.5","Avg>2.5","P>2.5")
             u25 = pick("B365<2.5","Avg<2.5","P<2.5")
-            # Hangi kaynaktan geldiğini işaretle
             src = "Bet365" if row.get("B365H","").strip() else "football-data.co.uk"
             out[f"{home}|||{away}"] = {
                 "home":home,"away":away,
@@ -1437,32 +1325,23 @@ def fetch_fixtures_with_odds(couk_code):
             }
         return out
 
-    # 1. Global fixtures.csv
     rows = fetch_text(FDCOUK_FIXTURE_URL)
     result = extract_odds(rows, require_div=couk_code)
     if result:
         return result
 
-    # 2. Güncel sezon CSV — require_div ile sadece bu ligi filtrele
     for season in ["2526","2425"]:
         url = f"https://www.football-data.co.uk/mmz4281/{season}/{couk_code}.csv"
         rows = fetch_text(url)
         if rows:
-            # Sezon CSV'de Div kolonu yok ama sadece bu ligin CSV'si — require_div gerekmez
-            # Ama güvenlik için filtre uygula (bazı CSV'lerde Div var)
             r2 = extract_odds(rows, require_div=None)
             if r2:
                 return r2
 
     return {}
 
-
-# ── API-FOOTBALL ODDS ────────────────────────────────────────────
-# Endpoint: GET /odds?fixture={id}&bookmaker=1&bet=1
-# Ücretsiz: 100 istek/gün · dashboard.api-football.com/register
 AF_BASE   = "https://v3.football.api-sports.io"
 
-# football-data.org liga ID → API-Football liga ID
 FD_TO_AF_LEAGUE = {
     "PL": 39, "ELC": 40, "FAC": 45,
     "PD": 140, "BL1": 78, "SA": 135,
@@ -1473,9 +1352,6 @@ FD_TO_AF_LEAGUE = {
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def af_get(endpoint, params, key):
-    """API-Football'a istek at. `key` cache key'e dahil edilir."""
-    # Not: Streamlit cache_data, mutable olmayan tüm argümanları cache key'e dahil eder.
-    # key (API anahtarı) str olduğu için otomatik dahil edilir — güvenli.
     try:
         r = requests.get(
             f"{AF_BASE}/{endpoint}",
@@ -1500,10 +1376,6 @@ def af_get(endpoint, params, key):
         return []
 
 def get_af_fixture_id(af_key, league_id, match_date, home_name, away_name):
-    """
-    API-Football'dan fixture ID bul — fuzzy team name matching ile.
-    """
-    # Season: 2025-26 sezonu için "2025", 2024-25 için "2024"
     year = int(match_date[:4])
     month = int(match_date[5:7])
     season_year = year if month >= 7 else year - 1
@@ -1529,16 +1401,11 @@ def get_af_fixture_id(af_key, league_id, match_date, home_name, away_name):
     return None
 
 def get_af_odds(af_key, fixture_id):
-    """
-    API-Football /odds endpoint — Bet365 öncelikli.
-    Bet365 bulunamazsa diğer bookmaker'lara geç.
-    """
     odds_data = af_get("odds", {"fixture": fixture_id}, af_key)
 
     if debug:
         st.caption(f"🐛 AF /odds fixture={fixture_id} → {len(odds_data)} item")
 
-    # Bet365 önce tara, bulunamazsa ilk bookmaker'ı kullan
     def parse_bookmaker(bm):
         o1 = ox = o2 = o25_ov = o25_un = None
         for bet in bm.get("bets", []):
@@ -1565,7 +1432,6 @@ def get_af_odds(af_key, fixture_id):
     for item in odds_data:
         bookmakers = item.get("bookmakers", [])
 
-        # Önce Bet365'i ara
         bet365_bm = next((bm for bm in bookmakers
                           if "bet365" in bm.get("name","").lower()), None)
         if bet365_bm:
@@ -1577,7 +1443,6 @@ def get_af_odds(af_key, fixture_id):
                 if debug: st.caption(f"🐛 Bet365 oranı bulundu: 1={o1} X={ox} 2={o2}")
                 break
 
-        # Bet365 yoksa diğer bookmaker'ları dene
         if not best_o1:
             for bm in bookmakers:
                 o1, ox, o2, o25_ov, o25_un = parse_bookmaker(bm)
@@ -1604,23 +1469,14 @@ def get_af_odds(af_key, fixture_id):
 
 def get_match_odds(sel_code, odds_api_key, hn, an, auto_odds,
                    match_date=None, af_key=None):
-    """
-    Oran çekme — öncelik sırası:
-    1. The Odds API  (ücretsiz 500/ay, Bet365 dahil)
-    2. API-Football  (ücretsiz 100/gün)
-    3. football-data.co.uk CSV (ücretsiz, key yok)
-    4. SofaScore scraping (key gerektirmez)
-    """
     if not auto_odds:
         return None
 
-    # ── 1. The Odds API ──────────────────────────────────────────
     if odds_api_key and odds_api_key.strip():
         result = get_odds_api_odds(odds_api_key, sel_code, hn, an, match_date)
         if result:
             return result
 
-    # ── 2. API-Football ──────────────────────────────────────────
     if af_key and af_key.strip():
         af_league = FD_TO_AF_LEAGUE.get(sel_code)
         if af_league and match_date:
@@ -1641,7 +1497,6 @@ def get_match_odds(sel_code, odds_api_key, hn, an, auto_odds,
                 if result:
                     return result
 
-    # ── 3. football-data.co.uk CSV ───────────────────────────────
     couk_code = FD_ORG_TO_COUK.get(sel_code)
     if couk_code:
         fo_key = f"fdcouk_{couk_code}"
@@ -1656,7 +1511,6 @@ def get_match_odds(sel_code, odds_api_key, hn, an, auto_odds,
         if result:
             return result
 
-    # ── 4. SofaScore scraping ────────────────────────────────────
     if match_date:
         result = get_sofascore_odds(hn, an, match_date)
         if result:
@@ -1664,14 +1518,8 @@ def get_match_odds(sel_code, odds_api_key, hn, an, auto_odds,
 
     return None
 
-
-# ── THE ODDS API ─────────────────────────────────────────────────
-# https://the-odds-api.com — ücretsiz 500 istek/ay, kayıt gerekli
-# Bet365, Pinnacle, Unibet, William Hill dahil
-
 ODDS_API_BASE = "https://api.the-odds-api.com/v4"
 
-# football-data.org kod → The Odds API sport key
 FD_TO_ODDSAPI_SPORT = {
     "PL":  "soccer_epl",
     "ELC": "soccer_efl_champ",
@@ -1686,7 +1534,6 @@ FD_TO_ODDSAPI_SPORT = {
     "ECL": "soccer_uefa_europa_conference_league",
     "BSA": "soccer_brazil_campeonato",
 }
-
 
 @st.cache_data(ttl=60, show_spinner=False)
 def fetch_live_odds_api(api_key, sport_key):
@@ -1712,7 +1559,9 @@ def get_live_match_odds(api_key, sport_key, hn, an):
                 fuzzy_match_team(game.get("away_team",""), an)):
             continue
         bms = game.get("bookmakers", [])
-        bm  = next((b for b in bms if "bet365"  in b.get("key","")), None) or               next((b for b in bms if "pinnacle" in b.get("key","")), None) or               (bms[0] if bms else None)
+        bm = next((b for b in bms if "bet365" in b.get("key","")), None) or \
+             next((b for b in bms if "pinnacle" in b.get("key","")), None) or \
+             (bms[0] if bms else None)
         if not bm:
             continue
         res = {"h2h":{}, "totals":{}, "source": bm.get("title","?")}
@@ -1721,15 +1570,15 @@ def get_live_match_odds(api_key, sport_key, hn, an):
                 for oc in mkt.get("outcomes",[]):
                     p = _safe_float(oc.get("price"))
                     n = oc.get("name","")
-                    if   n == game["home_team"]: res["h2h"]["1"] = round(p,2)
+                    if n == game["home_team"]: res["h2h"]["1"] = round(p,2)
                     elif n == game["away_team"]: res["h2h"]["2"] = round(p,2)
-                    else:                        res["h2h"]["X"] = round(p,2)
+                    else: res["h2h"]["X"] = round(p,2)
             elif mkt.get("key") == "totals":
                 for oc in mkt.get("outcomes",[]):
-                    pt  = _safe_float(oc.get("point"))
-                    pr  = _safe_float(oc.get("price"))
+                    pt = _safe_float(oc.get("point"))
+                    pr = _safe_float(oc.get("price"))
                     if not pt or not pr: continue
-                    dr  = "over" if "over" in oc.get("name","").lower() else "under"
+                    dr = "over" if "over" in oc.get("name","").lower() else "under"
                     res["totals"][f"{pt}_{dr}"] = round(pr,2)
         if res["h2h"] or res["totals"]:
             return res
@@ -1737,7 +1586,6 @@ def get_live_match_odds(api_key, sport_key, hn, an):
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def fetch_odds_api(api_key, sport_key):
-    """The Odds API'den tüm maçların oranlarını çek."""
     try:
         r = requests.get(
             f"{ODDS_API_BASE}/sports/{sport_key}/odds/",
@@ -1765,10 +1613,6 @@ def fetch_odds_api(api_key, sport_key):
         return []
 
 def get_odds_api_odds(api_key, sel_code, hn, an, match_date):
-    """
-    The Odds API'den belirli maçın Bet365 oranlarını çek.
-    Bet365 yoksa Pinnacle, yoksa ilk bookmaker.
-    """
     sport_key = FD_TO_ODDSAPI_SPORT.get(sel_code)
     if not sport_key:
         return None
@@ -1783,7 +1627,6 @@ def get_odds_api_odds(api_key, sel_code, hn, an, match_date):
     if not data:
         return None
 
-    # Maç tarihi filtresi (±1 gün tolerans)
     import datetime as _dt
     target_date = None
     if match_date:
@@ -1792,10 +1635,8 @@ def get_odds_api_odds(api_key, sel_code, hn, an, match_date):
         except:
             pass
 
-    # Takım adı eşleştir
     for game in data:
         gdate = game.get("commence_time","")[:10]
-        # Tarih filtresi
         if target_date:
             try:
                 gd = _dt.datetime.strptime(gdate, "%Y-%m-%d").date()
@@ -1809,7 +1650,6 @@ def get_odds_api_odds(api_key, sel_code, hn, an, match_date):
         if not (fuzzy_match_team(g_home, hn) and fuzzy_match_team(g_away, an)):
             continue
 
-        # Bookmaker öncelik: Bet365 → Pinnacle → Unibet → ilk
         bookmakers = game.get("bookmakers",[])
         def find_bm(name_frag):
             return next((b for b in bookmakers if name_frag.lower() in b.get("key","").lower()), None)
@@ -1824,11 +1664,11 @@ def get_odds_api_odds(api_key, sel_code, hn, an, match_date):
             if market.get("key") != "h2h":
                 continue
             for outcome in market.get("outcomes",[]):
-                name  = outcome.get("name","")
+                name = outcome.get("name","")
                 price = _safe_float(outcome.get("price"))
                 if name == g_home:   o1 = price
                 elif name == g_away: o2 = price
-                else:                ox = price  # Draw
+                else:                ox = price
 
         if o1 and ox and o2 and o1 > 1.0 and ox > 1.0 and o2 > 1.0:
             if debug: st.caption(f"🐛 OddsAPI [{bm_name}] {g_home} vs {g_away}: 1={o1} X={ox} 2={o2}")
@@ -1841,16 +1681,8 @@ def get_odds_api_odds(api_key, sel_code, hn, an, match_date):
     if debug: st.caption(f"🐛 OddsAPI: {hn} vs {an} bulunamadı ({sport_key})")
     return None
 
-
-# ── SOFASCORE SCRAPING ────────────────────────────────────────────
-# Key gerektirmez — public API endpoint (mobil app verileri)
-
 @st.cache_data(ttl=1800, show_spinner=False)
 def get_sofascore_odds(hn, an, match_date):
-    """
-    SofaScore public API'den maç oranları çek.
-    Format: /api/v1/sport/football/scheduled-events/YYYY-MM-DD
-    """
     try:
         headers = {
             "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) "
@@ -1859,7 +1691,6 @@ def get_sofascore_odds(hn, an, match_date):
             "Accept-Language": "en-US,en;q=0.9",
             "Referer": "https://www.sofascore.com/",
         }
-        # Günün tüm maçlarını çek
         r = requests.get(
             f"https://api.sofascore.com/api/v1/sport/football/scheduled-events/{match_date}",
             headers=headers, timeout=20
@@ -1871,7 +1702,6 @@ def get_sofascore_odds(hn, an, match_date):
         events = r.json().get("events", [])
         if debug: st.caption(f"🐛 SofaScore {match_date}: {len(events)} maç")
 
-        # Maçı bul
         target_id = None
         for ev in events:
             h_name = ev.get("homeTeam",{}).get("name","")
@@ -1885,7 +1715,6 @@ def get_sofascore_odds(hn, an, match_date):
             if debug: st.caption(f"🐛 SofaScore: {hn} vs {an} bulunamadı")
             return None
 
-        # Maçın oranlarını çek
         r2 = requests.get(
             f"https://api.sofascore.com/api/v1/event/{target_id}/odds/1/all",
             headers=headers, timeout=20
@@ -1895,19 +1724,17 @@ def get_sofascore_odds(hn, an, match_date):
             return None
 
         odds_data = r2.json()
-        # market tipini bul: 1x2 (fulltime)
         o1 = ox = o2 = None
         markets = odds_data.get("markets", []) or odds_data.get("oddgroups", [])
 
-        # Yapı: markets[].choices[].name + fractionalValue/decimalValue
         for market in markets:
             mname = (market.get("marketName") or market.get("name") or "").lower()
             if "1x2" not in mname and "full time" not in mname and "match winner" not in mname:
                 continue
             choices = market.get("choices") or market.get("odds") or []
             for ch in choices:
-                name  = (ch.get("name") or ch.get("choice") or "").strip()
-                val   = _safe_float(ch.get("decimalValue") or ch.get("decimal") or ch.get("odd"))
+                name = (ch.get("name") or ch.get("choice") or "").strip()
+                val = _safe_float(ch.get("decimalValue") or ch.get("decimal") or ch.get("odd"))
                 if not val or val <= 1.0:
                     continue
                 if name in ("1", "Home"):    o1 = val
@@ -1933,7 +1760,6 @@ def get_sofascore_odds(hn, an, match_date):
 
 @st.cache_data(ttl=86400, show_spinner=False)
 def fetch_season_csv(couk_code, season_code):
-    """Tek sezon CSV indir."""
     url = f"https://www.football-data.co.uk/mmz4281/{season_code}/{couk_code}.csv"
     try:
         import io, csv
@@ -1943,7 +1769,6 @@ def fetch_season_csv(couk_code, season_code):
         try:    text = r.content.decode("utf-8")
         except: text = r.content.decode("latin-1")
         rows = list(csv.DictReader(io.StringIO(text)))
-        # Sadece tamamlanmış maçlar (FTHG dolu)
         return [row for row in rows
                 if row.get("FTHG","").strip() and row.get("HTHG","").strip()]
     except:
@@ -1951,7 +1776,6 @@ def fetch_season_csv(couk_code, season_code):
 
 @st.cache_data(ttl=86400, show_spinner=False)
 def fetch_all_seasons(couk_code, n_seasons=3):
-    """Son N sezonu topla."""
     all_rows = []
     for sc in SEASON_CODES[:n_seasons]:
         rows = fetch_season_csv(couk_code, sc)
@@ -1959,10 +1783,8 @@ def fetch_all_seasons(couk_code, n_seasons=3):
     return all_rows
 
 def fuzzy_match_team(name1, name2):
-    """İki takım adını normalize edip benzerlik kontrol et."""
     def norm(s):
         s = s.lower().strip()
-        # Yaygın kısaltmaları normalize et
         replacements = [
             (" fc",""),("fc ",""),(" afc",""),("afc ",""),(" utd",""),
             (" united",""),(" city",""),(" town",""),(" cf",""),(" sc",""),
@@ -1984,9 +1806,7 @@ def fuzzy_match_team(name1, name2):
     if n1 == n2: return True
     if len(n1) >= 4 and n1 in n2: return True
     if len(n2) >= 4 and n2 in n1: return True
-    # 4 harf ön eşleşme
     if len(n1) >= 4 and len(n2) >= 4 and n1[:4] == n2[:4]: return True
-    # Kelime bazlı eşleşme — ortak kelime varsa
     w1 = set(n1.split())
     w2 = set(n2.split())
     common = w1 & w2
@@ -1994,10 +1814,6 @@ def fuzzy_match_team(name1, name2):
     return False
 
 def match_odds_to_fixture(fixtures_odds, h_name, a_name):
-    """
-    football-data.co.uk odds dict'inden verilen maçı bul.
-    Fuzzy matching kullanır.
-    """
     for key, info in fixtures_odds.items():
         fh, fa = info["home"], info["away"]
         if fuzzy_match_team(fh, h_name) and fuzzy_match_team(fa, a_name):
@@ -2005,12 +1821,6 @@ def match_odds_to_fixture(fixtures_odds, h_name, a_name):
     return None
 
 def auto_pattern_search(couk_code, o1, ox, o2, n_seasons=3, tol=0.25):
-    """
-    Tam otomatik pattern arama:
-    1. Son N sezonu çek
-    2. Benzer oranları bul
-    3. İY/MS skor dağılımını hesapla
-    """
     all_rows = fetch_all_seasons(couk_code, n_seasons)
     if not all_rows:
         return None, 0
@@ -2020,47 +1830,6 @@ def auto_pattern_search(couk_code, o1, ox, o2, n_seasons=3, tol=0.25):
     pattern = analyze_score_patterns(matched, o1, ox, o2)
     return pattern, len(all_rows)
 
-
-FD_CO_UK_LEAGUES = {
-    "PL":  ("E0", [2425,2324,2223,2122,2021]),
-    "ELC": ("E1", [2425,2324,2223,2122,2021]),
-    "PD":  ("SP1",[2425,2324,2223,2122,2021]),
-    "BL1": ("D1", [2425,2324,2223,2122,2021]),
-    "SA":  ("I1", [2425,2324,2223,2122,2021]),
-    "FL1": ("F1", [2425,2324,2223,2122,2021]),
-    "DED": ("N1", [2425,2324,2223,2122,2021]),
-    "PPL": ("P1", [2425,2324,2223,2122,2021]),
-}
-
-@st.cache_data(ttl=86400, show_spinner=False)
-def load_fdcouk_csv(league_code_co, season_code):
-    """football-data.co.uk CSV'sini indir ve parse et."""
-    url = f"https://www.football-data.co.uk/mmz4281/{season_code}/{league_code_co}.csv"
-    try:
-        import io
-        r = requests.get(url, timeout=15)
-        if r.status_code != 200:
-            return None
-        # UTF-8 veya latin-1
-        try:
-            text = r.content.decode("utf-8")
-        except:
-            text = r.content.decode("latin-1")
-        import csv
-        rows = list(csv.DictReader(io.StringIO(text)))
-        return [row for row in rows if row.get("FTHG","").strip() and row.get("HTHG","").strip()]
-    except:
-        return None
-
-def get_season_data(fd_league_code, seasons):
-    """Birden fazla sezonu yükle ve birleştir."""
-    all_rows = []
-    for s in seasons:
-        rows = load_fdcouk_csv(fd_league_code, s)
-        if rows:
-            all_rows.extend(rows)
-    return all_rows
-
 def _safe_float(val, default=None):
     try:
         return float(str(val).strip())
@@ -2068,14 +1837,8 @@ def _safe_float(val, default=None):
         return default
 
 def find_similar_odds_matches(rows, o1_target, ox_target, o2_target, tol=0.25):
-    """
-    Verilen oran aralığına benzer geçmiş maçları bul.
-    Öncelik: Bet365 → Avg → PS → IW → VC
-    Tolerans: ±tol (örn: ±0.25 oran farkı kabul et)
-    """
     matched = []
     for row in rows:
-        # Öncelik sırası: Bet365 → Avg → PS → IW → VC
         h_odds = _safe_float(row.get("B365H") or row.get("AvgH") or row.get("PSH") or row.get("IWH") or row.get("VCH"))
         d_odds = _safe_float(row.get("B365D") or row.get("AvgD") or row.get("PSD") or row.get("IWD") or row.get("VCD"))
         a_odds = _safe_float(row.get("B365A") or row.get("AvgA") or row.get("PSA") or row.get("IWA") or row.get("VCA"))
@@ -2088,7 +1851,6 @@ def find_similar_odds_matches(rows, o1_target, ox_target, o2_target, tol=0.25):
         if (abs(h_odds - float(o1_target)) <= tol and
             abs(d_odds - float(ox_target)) <= tol and
             abs(a_odds - float(o2_target)) <= tol):
-            # Bet365 oranını kaydet (karşılaştırma için)
             row["_b365h"] = h_odds
             row["_b365d"] = d_odds
             row["_b365a"] = a_odds
@@ -2097,10 +1859,6 @@ def find_similar_odds_matches(rows, o1_target, ox_target, o2_target, tol=0.25):
     return matched
 
 def analyze_score_patterns(matched_rows, o1, ox, o2):
-    """
-    Benzer oranlı maçlarda hangi skorlar çıkmış?
-    İY + MS + dönüşleri analiz et.
-    """
     if not matched_rows:
         return None
 
@@ -2111,7 +1869,7 @@ def analyze_score_patterns(matched_rows, o1, ox, o2):
     ht_scores  = Counter()
     results    = Counter()
     ht_results = Counter()
-    turnovers  = defaultdict(int)  # 2/1, 1/2, X/1, X/2 vb.
+    turnovers  = defaultdict(int)
 
     for row in matched_rows:
         try:
@@ -2125,23 +1883,19 @@ def analyze_score_patterns(matched_rows, o1, ox, o2):
         ms_scores[f"{fthg}-{ftag}"] += 1
         ht_scores[f"{hthg}-{htag}"] += 1
 
-        # MS sonuç
         if fthg > ftag:   results["1"] += 1
         elif fthg < ftag: results["2"] += 1
         else:             results["X"] += 1
 
-        # İY sonuç
         if hthg > htag:   ht_results["1"] += 1
         elif hthg < htag: ht_results["2"] += 1
         else:             ht_results["X"] += 1
 
-        # İY/MS dönüş
         iy_r = "1" if hthg>htag else ("2" if hthg<htag else "X")
         ms_r = "1" if fthg>ftag else ("2" if fthg<ftag else "X")
         combo = f"{iy_r}/{ms_r}"
         turnovers[combo] += 1
 
-    # Yüzde hesapla
     def pcts(counter, total):
         return {k: round(v/total*100, 1) for k,v in counter.most_common(10)}
 
@@ -2151,14 +1905,12 @@ def analyze_score_patterns(matched_rows, o1, ox, o2):
     htr_pct = {k: round(v/n*100,1) for k,v in ht_results.items()}
     trn_pct = {k: round(v/n*100,1) for k,v in sorted(turnovers.items(), key=lambda x:-x[1])[:9]}
 
-    # Öne çıkan dönüşler
     notable = []
     for combo, pct in trn_pct.items():
         iy_p, ms_p = combo.split("/")
         if iy_p != ms_p and pct >= 8:
             notable.append((combo, pct))
 
-    # Oran bazlı sürpriz tespiti
     try:
         imp_h = round(1/float(o1)/(1/float(o1)+1/float(ox)+1/float(o2))*100, 1)
     except:
@@ -2179,7 +1931,6 @@ def analyze_score_patterns(matched_rows, o1, ox, o2):
     }
 
 def render_pattern_panel(pattern, o1, ox, o2, h, a, odds_source="football-data.co.uk"):
-    """Oran-Skor Pattern panelini render et — temiz, okunabilir tasarım."""
     if not pattern:
         st.info("Bu oran aralığı için yeterli geçmiş maç bulunamadı.")
         return
@@ -2189,12 +1940,10 @@ def render_pattern_panel(pattern, o1, ox, o2, h, a, odds_source="football-data.c
     htr = pattern["htr_pct"]
     mono = "JetBrains Mono,monospace"
 
-    # Kaynak rozet rengi
     is_b365 = "bet365" in odds_source.lower() or "Bet365" in odds_source
     src_cls  = "bet365" if is_b365 else ""
     src_icon = "🔵 Bet365" if is_b365 else f"📊 {odds_source[:20]}"
 
-    # ── HEADER ────────────────────────────────────────────────────
     header_html = (
         f'<div class="pattern-wrap">'
         f'<div class="pattern-header">'
@@ -2202,7 +1951,6 @@ def render_pattern_panel(pattern, o1, ox, o2, h, a, odds_source="football-data.c
         f'<span class="pattern-title">Benzer Bet365 Oranlarında Geçmiş Maçlar</span>'
         f'<span class="pattern-n">{n} maç analiz edildi</span>'
         f'</div>'
-        # Oran çubuğu
         f'<div class="pattern-odds-row">'
         f'<div class="pat-odd-box home"><span class="pat-odd-lbl">{h[:12]}</span>'
         f'<span class="pat-odd-val">{o1}</span></div>'
@@ -2216,9 +1964,8 @@ def render_pattern_panel(pattern, o1, ox, o2, h, a, odds_source="football-data.c
         f'</div>'
     )
 
-    # ── MS + İY SONUÇ KUTULARI ───────────────────────────────────
     def res_trio(res_dict, home_lbl, away_lbl, prefix=""):
-        total_n = n  # maç sayısı
+        total_n = n
         return (
             f'<div class="pat-res-trio">'
             f'<div class="pat-res-box pat-home">'
@@ -2239,7 +1986,6 @@ def render_pattern_panel(pattern, o1, ox, o2, h, a, odds_source="football-data.c
             f'</div>'
         )
 
-    # ── SKOR BAR LİSTESİ ────────────────────────────────────────
     def skor_bar_list(scores_dict, fill_color):
         if not scores_dict:
             return '<div style="font-size:.68rem;color:#4a6880">Veri yetersiz</div>'
@@ -2261,7 +2007,6 @@ def render_pattern_panel(pattern, o1, ox, o2, h, a, odds_source="football-data.c
         html += '</div>'
         return html
 
-    # ── COMBO GRID ───────────────────────────────────────────────
     def combo_grid_html(combos_dict):
         combo_desc = {
             "1/1": "Ev önde kalır","X/1": "Ber→Ev kazanır","2/1": "DEP→EV DÖNÜŞ",
@@ -2284,7 +2029,6 @@ def render_pattern_panel(pattern, o1, ox, o2, h, a, odds_source="football-data.c
         html += '</div>'
         return html
 
-    # ── NOTABLE DÖNÜŞLER ─────────────────────────────────────────
     notable_html = ""
     if pattern.get("notable_turnovers"):
         notable_html = '<div class="pat-sec"><div class="pat-sec-lbl">⚡ Öne Çıkan Dönüşler</div>'
@@ -2303,33 +2047,27 @@ def render_pattern_panel(pattern, o1, ox, o2, h, a, odds_source="football-data.c
             )
         notable_html += '</div>'
 
-    # ── HEPSİNİ BİRLEŞTİR ───────────────────────────────────────
     body_html = (
         f'{header_html}'
         f'<div class="pattern-body">'
 
-        # MS Sonuçlar
         f'<div class="pat-sec">'
         f'<div class="pat-sec-lbl">Maç Sonu Sonuçları — Bu oran aralığında {n} maçta</div>'
         + res_trio(res, h, a, prefix="MS ") +
         f'</div>'
 
-        # İY Sonuçlar
         f'<div class="pat-sec">'
         f'<div class="pat-sec-lbl">İlk Yarı Sonuçları — Aynı {n} maçta</div>'
         + res_trio(htr, h, a, prefix="İY ") +
         f'</div>'
 
-        # İY/MS Kombolar
         f'<div class="pat-sec">'
         f'<div class="pat-sec-lbl">İY / MS Kombinasyonları — Dönüş Analizi (turuncu = dönüş)</div>'
         + combo_grid_html(pattern["trn_pct"]) +
         f'</div>'
 
-        # Notable dönüşler
         + notable_html +
 
-        # Skor dağılımları
         f'<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">'
         f'<div class="pat-sec">'
         f'<div class="pat-sec-lbl">Maç Sonu Skor Dağılımı</div>'
@@ -2340,18 +2078,16 @@ def render_pattern_panel(pattern, o1, ox, o2, h, a, odds_source="football-data.c
         + skor_bar_list(pattern["ht_top"], "#a78bfa") +
         f'</div></div>'
 
-        # Alt not
         f'<div style="font-size:.58rem;color:#2a3a4a;margin-top:8px;text-align:right;padding-top:6px;border-top:1px solid #1c2e44">'
         f'Sürpriz oranı (favori kaybet/berabere): %{pattern["upset_rate"]}'
         f'</div>'
 
-        f'</div></div>'  # pattern-body + pattern-wrap
+        f'</div></div>'
     )
 
     st.markdown(body_html, unsafe_allow_html=True)
 
 def odds_implied_probs(o1, ox, o2):
-    """Oranlardan zımni olasılık (vig çıkarılmış)."""
     try:
         f1, fx, f2 = 1/float(o1), 1/float(ox), 1/float(o2)
         margin = f1 + fx + f2
@@ -2365,14 +2101,12 @@ def odds_implied_probs(o1, ox, o2):
         return None
 
 def odds_value_score(model_pct, implied_pct):
-    """Value skoru: model > implied → pozitif value."""
     if not implied_pct or implied_pct == 0: return None
     edge = model_pct - implied_pct
     kelly = edge / (100 - implied_pct) if edge > 0 else 0
     return {"edge": round(edge, 1), "kelly": round(kelly*100, 1)}
 
 def odds_risk_level(o1, ox, o2):
-    """Oran yapısına göre maç risk seviyesi."""
     try:
         vals = [float(o1), float(ox), float(o2)]
         lo = min(vals)
@@ -2384,23 +2118,14 @@ def odds_risk_level(o1, ox, o2):
         return "BİLİNMİYOR", "Oran verisi yok"
 
 def odds_deviation(sources):
-    """Bookmaker'lar arası maksimum sapma."""
     valid = [v for v in sources if v is not None]
     if len(valid) < 2: return None
     return round(max(valid) - min(valid), 3)
 
-
-# ── GROQ İLE OTOMATİK ORAN TAHMİNİ ─────────────────────────────
 def estimate_odds_with_groq(h, a, stats, hf, af, h2h, h_stand, a_stand):
-    """
-    Groq Llama'ya bu maç için tahmini piyasa oranları sor.
-    SADECE gerçek veri yoksa fallback olarak kullanılır.
-    Kaynak etiketi 'groq-tahmin' veya 'model-tahmin' olarak işaretlenir.
-    """
     fv = lambda d,k,dv=0: d.get(k,dv) if d else dv
     hs = h_stand or {}; as_ = a_stand or {}
 
-    # Gerçek xG değerlerini hesapla (stats'tan değil, form'dan)
     hxg_real = fv(hf,'avg_gf',1.2)
     axg_real = fv(af,'avg_gf',1.0)
 
@@ -2432,7 +2157,6 @@ X: [oran]
         r.raise_for_status()
         text = r.json()["choices"][0]["message"]["content"].strip()
         import re
-        # Satır satır parse et — daha güvenli
         o1 = ox = o2 = None
         for line in text.splitlines():
             line = line.strip()
@@ -2442,30 +2166,26 @@ X: [oran]
             if m1: o1 = round(float(m1.group(1)), 2)
             if mx: ox = round(float(mx.group(1)), 2)
             if m2: o2 = round(float(m2.group(1)), 2)
-        # Makulluk kontrolü: tüm oranlar 1.05–25 arasında ve toplam vig makul
         if o1 and ox and o2:
             if 1.05 <= o1 <= 25 and 1.05 <= ox <= 25 and 1.05 <= o2 <= 25:
                 implied_sum = 1/o1 + 1/ox + 1/o2
-                if 1.02 <= implied_sum <= 1.20:  # %2–%20 vig aralığı
+                if 1.02 <= implied_sum <= 1.20:
                     return {"o1": o1, "ox": ox, "o2": o2,
                             "o25_ov": None, "o25_un": None,
                             "source": "groq-tahmin"}
     except:
         pass
 
-    # Fallback: Poisson olasılıklarından doğrudan oran hesapla (%8 bookmaker marjı)
     try:
         p1 = max(5, stats["p1"]) / 100
         px = max(5, stats["px"]) / 100
         p2 = max(5, stats["p2"]) / 100
-        # Normalize et (toplam 1 olsun)
         total = p1 + px + p2
         p1 /= total; px /= total; p2 /= total
         margin = 1.08
         o1_calc = round(1 / p1 / margin, 2)
         ox_calc = round(1 / px / margin, 2)
         o2_calc = round(1 / p2 / margin, 2)
-        # Mantıklı aralık kontrolü
         if 1.05 <= o1_calc <= 20 and 1.05 <= ox_calc <= 20 and 1.05 <= o2_calc <= 20:
             return {
                 "o1": o1_calc, "ox": ox_calc, "o2": o2_calc,
@@ -2477,11 +2197,6 @@ X: [oran]
     return None
 
 def analyze_odds(o1, ox, o2, model_stats, h_name, a_name):
-    """
-    Ana odds analiz fonksiyonu — mevcut model istatistikleriyle karşılaştır.
-    model_stats: compute_stats() çıktısı (p1, px, p2 içerir)
-    Döndürür: odds_analysis dict
-    """
     if not o1 or not ox or not o2:
         return None
 
@@ -2491,12 +2206,10 @@ def analyze_odds(o1, ox, o2, model_stats, h_name, a_name):
 
     risk_lv, risk_why = odds_risk_level(o1, ox, o2)
 
-    # Value hesapla (model vs piyasa)
     v1 = odds_value_score(model_stats["p1"], imp["p1"])
     vx = odds_value_score(model_stats["px"], imp["px"])
     v2 = odds_value_score(model_stats["p2"], imp["p2"])
 
-    # En yüksek value
     values = [
         ("1", h_name, v1, float(o1)),
         ("X", "Beraberlik", vx, float(ox)),
@@ -2508,7 +2221,6 @@ def analyze_odds(o1, ox, o2, model_stats, h_name, a_name):
         default=None
     )
 
-    # Favori tespiti
     try:
         o1f, oxf, o2f = float(o1), float(ox), float(o2)
         if o1f < o2f and o1f < oxf:
@@ -2520,14 +2232,12 @@ def analyze_odds(o1, ox, o2, model_stats, h_name, a_name):
     except:
         fav, fav_odd = "unknown", 0
 
-    # Upset olasılığı (underdog kazanma)
     try:
         underdog_odd = max(float(o1), float(o2))
         upset_risk = "YÜKSEK" if underdog_odd < 3.5 else "ORTA" if underdog_odd < 5.0 else "DÜŞÜK"
     except:
         upset_risk = "BİLİNMİYOR"
 
-    # Oran hareketi anomalisi (açılış vs kapanış, eğer verilmişse)
     movement_signals = []
     try:
         if o1f < 1.60 and model_stats["p1"] < imp["p1"] - 5:
@@ -2539,7 +2249,6 @@ def analyze_odds(o1, ox, o2, model_stats, h_name, a_name):
     except:
         pass
 
-    # Öneri sinyalleri
     signals = []
     try:
         if o1f < 1.50 and model_stats["p1"] < 55:
@@ -2571,7 +2280,6 @@ def analyze_odds(o1, ox, o2, model_stats, h_name, a_name):
     }
 
 def odds_to_prompt_segment(oa, h, a):
-    """Odds analizini Groq promptuna eklenecek formata çevir."""
     if not oa: return ""
     imp = oa["imp"]
     bv = oa["best_value"]
@@ -2582,7 +2290,6 @@ def odds_to_prompt_segment(oa, h, a):
             f"RİSK:{oa['risk_level']} | {bv_str} | SİNYAL:{sigs}")
 
 def render_odds_panel(oa, h, a, model_stats):
-    """Odds panelini Streamlit'e render et — kaynak uyarısı ile."""
     if not oa:
         return
 
@@ -2591,7 +2298,6 @@ def render_odds_panel(oa, h, a, model_stats):
     _src  = oa.get("_source", "")
     _is_est = "groq" in _src.lower() or "model" in _src.lower()
 
-    # Kaynak banner
     if _is_est:
         st.warning(f"⚠️ **Gerçek oran bulunamadı** — `{_src}` kullanıldı. "
                    f"Gerçek oran için: **The Odds API** key girin (the-odds-api.com, ücretsiz 500/ay) "
@@ -2680,11 +2386,9 @@ def render_odds_panel(oa, h, a, model_stats):
 def build_prompt(h, a, hf, af, h2h, hxg, axg, h_htxg, a_htxg,
                  stats, h_stand, a_stand, h_sc, a_sc, top_ms, top_ht,
                  odds_analysis=None):
-    """Profesyonel, istatistik temelli, pattern odaklı betting analiz promptu."""
     fv = lambda d,k,dv=0: d.get(k,dv) if d else dv
     hs = h_stand or {}; as_ = a_stand or {}
 
-    # Maç karakteri flagleri
     chars = []
     diff = round(hxg - axg, 2)
     if diff > 0.6:    chars.append(f"EV_FAVORİ xG+{diff}")
@@ -2707,10 +2411,8 @@ def build_prompt(h, a, hf, af, h2h, hxg, axg, h_htxg, a_htxg,
     h_sc_str = f"{h_sc.get('name','?')}({h_sc.get('goals',0)}g)" if h_sc else "Veri yok"
     a_sc_str = f"{a_sc.get('name','?')}({a_sc.get('goals',0)}g)" if a_sc else "Veri yok"
 
-    # Oran segmenti
     oran_seg = odds_to_prompt_segment(odds_analysis, h, a) if odds_analysis else "Oran verisi girilmedi"
 
-    # İY kritik skor olasılıkları (Poisson matrisinden)
     iy_11 = next((round(v,1) for (hg,ag),v in top_ht if hg==1 and ag==1), 0)
     iy_10 = next((round(v,1) for (hg,ag),v in top_ht if hg==1 and ag==0), 0)
     iy_01 = next((round(v,1) for (hg,ag),v in top_ht if hg==0 and ag==1), 0)
@@ -2721,7 +2423,6 @@ def build_prompt(h, a, hf, af, h2h, hxg, axg, h_htxg, a_htxg,
     iy_20 = next((round(v,1) for (hg,ag),v in top_ht if hg==2 and ag==0), 0)
     iy_02 = next((round(v,1) for (hg,ag),v in top_ht if hg==0 and ag==2), 0)
 
-    # MS kritik skor olasılıkları
     ms_10 = next((round(v,1) for (hg,ag),v in top_ms if hg==1 and ag==0), 0)
     ms_20 = next((round(v,1) for (hg,ag),v in top_ms if hg==2 and ag==0), 0)
     ms_21 = next((round(v,1) for (hg,ag),v in top_ms if hg==2 and ag==1), 0)
@@ -2865,9 +2566,7 @@ SKOR ÖNERİSİ: İY [X-Y] + MS [X-Y] — [tutarlı gerekçe, skor dağılımıy
 
     return prompt
 
-
 def groq_call(prompt, retries=4):
-    """Groq API — rate limit için akıllı retry ve Retry-After header desteği."""
     import json as _json
     for attempt in range(retries):
         try:
@@ -2877,17 +2576,16 @@ def groq_call(prompt, retries=4):
                 json={"model":groq_model,
                       "messages":[{"role":"user","content":prompt}],
                       "temperature":0.2,
-                      "max_tokens":3500},   # Profesyonel 7-bölüm analiz için artırıldı
+                      "max_tokens":3500},
                 timeout=120)
 
             if r.status_code == 429:
-                # Groq Retry-After header'ını oku
                 retry_after = r.headers.get("retry-after") or r.headers.get("Retry-After")
                 try:
                     wait = int(float(retry_after)) + 2 if retry_after else 20 + attempt * 15
                 except:
                     wait = 20 + attempt * 15
-                wait = min(wait, 60)  # max 60sn bekle
+                wait = min(wait, 60)
                 ph = st.empty()
                 for remaining in range(wait, 0, -1):
                     ph.warning(f"⏳ Rate limit — {remaining}sn bekleniyor... (deneme {attempt+1}/{retries})")
@@ -2921,18 +2619,14 @@ def groq_call(prompt, retries=4):
 def parse_analysis(text):
     import re
 
-    # Yeni format: ### 🔍 1. Başlık  VEYA eski format: ### 1) Başlık
-    # Her iki formatı da destekle
     parts = re.split(r'###\s*(?:[^\d]*)?\d+[.)]\s*', text)
     hdrs  = re.findall(r'###\s*(?:[^\d]*)?\d+[.)]\s*(.+)', text)
     secs  = {}
     for hdr, content in zip(hdrs, parts[1:]):
         key = hdr.strip().upper()
-        # Emoji ve özel karakterleri temizle (eşleştirme için)
         key_clean = re.sub(r'[^\w\s]', ' ', key).strip()
         secs[key_clean] = content.strip()
 
-    # Senaryoları parse et — Bölüm 3 (Dönüş Analizi) veya eski SENARYOLAR
     scenarios = []
     for k, v in secs.items():
         if any(x in k for x in ["SENARYO", "DÖNÜ", "DONUS", "2 1", "1 2"]):
@@ -2947,7 +2641,6 @@ def parse_analysis(text):
                         "desc": line
                     })
 
-    # Tavsiyeler — Bölüm 6 (Tahmin Sonuçları) veya eski TAVSİYELER
     preds = {}
     for k, v in secs.items():
         if any(x in k for x in ["TAHMİN", "TAHMIN", "TAVSİYE", "TAVSIYE", "SONUÇ", "SONUC"]):
@@ -2960,7 +2653,6 @@ def parse_analysis(text):
                         key_out = "SKOR" if "SKOR" in tag else tag_norm[:5]
                         preds[key_out] = line.split(":", 1)[-1].strip()
 
-    # Özel skor listeleri — Bölüm 4 (Skor Dağılımı) → İY ve MS
     def parse_score_list(section_text):
         items = []
         for line in section_text.split("\n"):
@@ -2976,7 +2668,6 @@ def parse_analysis(text):
     for k, v in secs.items():
         k_norm = k.replace("İ","I").replace("Ş","S").replace("Ü","U").replace("Ö","O")
         if any(x in k_norm for x in ["SKOR OLASILIK", "SKOR DAGILIM", "ILK YARI OZEL", "IY OZEL"]):
-            # İY satırlarını çek
             iy_block = re.search(r'IY.*?(?=MS|$)', v, re.S | re.I)
             ms_block = re.search(r'MS.*', v, re.S | re.I)
             if iy_block: iy_special = parse_score_list(iy_block.group())
@@ -2985,8 +2676,6 @@ def parse_analysis(text):
     return secs, scenarios, preds, iy_special, ms_special
 
 def render_live_match(m, live_stats, lp, analysis_text, hf, af, h2h):
-    """Canlı maç — İY + MS profesyonel analiz paneli."""
-
     h      = m["homeTeam"]["name"]
     a      = m["awayTeam"]["name"]
     h_sc   = m.get("score",{}).get("fullTime",{}).get("home") or 0
@@ -2999,7 +2688,6 @@ def render_live_match(m, live_stats, lp, analysis_text, hf, af, h2h):
     ms_rem = lp.get("remaining_min", 0)
     fv     = lambda d,k,dv=0: d.get(k,dv) if d else dv
 
-    # ── BAŞLIK ───────────────────────────────────────────────────
     phase = f"1. Yarı — {ht_rem}dk kaldı" if is_ht and ht_rem > 0 else ("Devre Arası" if is_ht else f"2. Yarı — {ms_rem}dk kaldı")
     st.markdown(
         f'<div class="live-header">'
@@ -3011,14 +2699,11 @@ def render_live_match(m, live_stats, lp, analysis_text, hf, af, h2h):
         f'</div>', unsafe_allow_html=True
     )
 
-    # ── SKOR KARTI ───────────────────────────────────────────────
-    # football-data.org goals array: [{minute, team:{id}, scorer:{name}, assist:{name}}]
     events_h = events_a = ""
     home_id = m.get("homeTeam",{}).get("id")
     for ev in m.get("goals", []):
         team_id = ev.get("team",{}).get("id")
         scorer  = ev.get("scorer",{}).get("name") or ev.get("scorer",{}).get("shortName","?")
-        # Soyad al (son kelime)
         scorer_short = scorer.split()[-1] if scorer else "?"
         mi      = ev.get("minute","?")
         inj     = ev.get("injuryTime")
@@ -3029,12 +2714,9 @@ def render_live_match(m, live_stats, lp, analysis_text, hf, af, h2h):
         else:
             events_a += line
     
-    # Skor doğrulaması: goal sayısı skora eşit değilse
-    # (API bazen goals listesini geç güncelliyor) skoru göster ama golü boş bırak
     goal_h_count = sum(1 for ev in m.get("goals",[]) if ev.get("team",{}).get("id") == home_id)
     goal_a_count = len(m.get("goals",[])) - goal_h_count
     if goal_h_count != h_sc or goal_a_count != a_sc:
-        # Skorla uyumsuz — isim yerine sadece sayı göster
         if h_sc > 0 and not events_h:
             events_h = "⚽ " * h_sc
         if a_sc > 0 and not events_a:
@@ -3058,7 +2740,6 @@ def render_live_match(m, live_stats, lp, analysis_text, hf, af, h2h):
   </div>
 """, unsafe_allow_html=True)
 
-    # ── İSTATİSTİK BARLARI ───────────────────────────────────────
     stats_display = [
         ("Top Kontrolü",  f"%{int(live_stats['possession_h'])}",  f"%{int(live_stats['possession_a'])}",   live_stats['possession_h'],  live_stats['possession_a']),
         ("Şut/İsabetli",  f"{int(live_stats['shots_h'])}/{int(live_stats['shots_on_h'])}",
@@ -3085,7 +2766,6 @@ def render_live_match(m, live_stats, lp, analysis_text, hf, af, h2h):
             f'</div>'
         )
 
-    # Momentum bar
     mom = lp.get("momentum_h", 50)
     stat_html += f"""
 <div class="momentum-wrap">
@@ -3100,9 +2780,7 @@ def render_live_match(m, live_stats, lp, analysis_text, hf, af, h2h):
     stat_html += '</div>'
     st.markdown(stat_html + '</div>', unsafe_allow_html=True)
 
-    # ── İLK YARI PANEL (1Y devam ediyorsa tam panel, bittiyse özet) ─
     if is_ht and ht_rem > 0:
-        # 1. Yarı devam ediyor — İY olasılıkları büyük göster
         st.markdown(f"""
 <div style="background:#09101e;border:2px solid #1d4ed8;border-radius:10px;
 padding:.9rem 1.4rem;margin-bottom:.7rem">
@@ -3128,7 +2806,6 @@ padding:.9rem 1.4rem;margin-bottom:.7rem">
 </div>
 """, unsafe_allow_html=True)
     else:
-        # İlk yarı bitti — özet göster
         ht_winner = f"{h} önde" if ht_h > ht_a else (f"{a} önde" if ht_a > ht_h else "Berabere")
         st.markdown(f"""
 <div style="background:#09101e;border:1px solid #1c2e44;border-radius:8px;
@@ -3143,7 +2820,6 @@ padding:.7rem 1.2rem;margin-bottom:.7rem;display:flex;align-items:center;gap:12p
 </div>
 """, unsafe_allow_html=True)
 
-    # ── MAÇ SONU PANEL ───────────────────────────────────────────
     st.markdown(f"""
 <div style="background:#09101e;border:1px solid #1c2e44;border-radius:10px;
 padding:.9rem 1.4rem;margin-bottom:.7rem">
@@ -3165,19 +2841,16 @@ padding:.9rem 1.4rem;margin-bottom:.7rem">
 </div>
 """, unsafe_allow_html=True)
 
-    # ── ANALİZ METNİ + BAHİS TAVSİYELERİ ────────────────────────
     if analysis_text:
         import re as _re
 
-        # Section'ları çek
-        durum     = _extract_section(analysis_text, "CANLI DURUM")
+        durum = _extract_section(analysis_text, "CANLI DURUM")
         iy_analiz = _extract_section(analysis_text, "İLK YARI")
         ms_analiz = _extract_section(analysis_text, "MAÇ SONU")
-        all_recs  = _parse_goal_bets(analysis_text)
-        iy_recs   = _parse_iy_bets(analysis_text)
+        all_recs = _parse_goal_bets(analysis_text)
+        iy_recs = _parse_iy_bets(analysis_text)
         bekle_txt = _extract_bekle_gec(analysis_text)
 
-        # Durum analizi
         if durum:
             st.markdown(f"""
 <div style="background:#0d1829;border:1px solid #1c2e44;border-radius:8px;
@@ -3187,7 +2860,6 @@ padding:.75rem 1.1rem;margin-bottom:.6rem">
   <div style="font-size:.76rem;color:#7a9ab8;line-height:1.75">{durum}</div>
 </div>""", unsafe_allow_html=True)
 
-        # İY analizi (sadece ilk yarı devam ediyorsa veya yeni bittiyse)
         if iy_analiz:
             st.markdown(f"""
 <div style="background:#060f20;border:1px solid #1d4ed8;border-radius:8px;
@@ -3197,7 +2869,6 @@ padding:.75rem 1.1rem;margin-bottom:.6rem">
   <div style="font-size:.76rem;color:#7a9ab8;line-height:1.75">{iy_analiz}</div>
 </div>""", unsafe_allow_html=True)
 
-        # İY bahis kartları
         if iy_recs:
             st.markdown('<div style="font-size:.54rem;font-weight:700;letter-spacing:.12em;'
                        'text-transform:uppercase;color:#4c9eff;margin-bottom:5px">⏱ İY Bahis Tavsiyeleri</div>',
@@ -3215,7 +2886,6 @@ padding:.75rem 1.1rem;margin-bottom:.6rem">
   <div class="grb-conf" style="color:#4c9eff">{conf}</div>
 </div>""", unsafe_allow_html=True)
 
-        # MS bahis kartları
         if all_recs:
             st.markdown('<div style="font-size:.54rem;font-weight:700;letter-spacing:.12em;'
                        'text-transform:uppercase;color:#4a6880;margin:.6rem 0 5px">🏁 MS Bahis Tavsiyeleri</div>',
@@ -3233,7 +2903,6 @@ padding:.75rem 1.1rem;margin-bottom:.6rem">
   <div class="grb-conf">{conf}</div>
 </div>""", unsafe_allow_html=True)
 
-        # Bekle / Geç → artık ŞİMDİ AL / GEÇME formatında
         if bekle_txt:
             simdi_al_txt, gecme_txt = bekle_txt
             parts_html = ""
@@ -3264,7 +2933,6 @@ def _prob_box(label, val, is_xg=False):
             + '</div>')
 
 def _parse_goal_bets(text):
-    """GOL_BAHSI satırlarını parse et."""
     import re as _re
     recs = []
     for line in text.splitlines():
@@ -3274,7 +2942,6 @@ def _parse_goal_bets(text):
     return recs[:3]
 
 def _parse_iy_bets(text):
-    """IY_BAHSI satırlarını parse et."""
     import re as _re
     recs = []
     for line in text.splitlines():
@@ -3288,16 +2955,13 @@ def _extract_section(text, keyword):
     m = _re.search(rf'###\s*\d*\.?\s*{keyword}.*?\n(.*?)(?=###|\Z)', text, _re.S | _re.I)
     if m:
         content = m.group(1).strip()
-        # Bahis satırlarını çıkar
         content = _re.sub(r'(GOL_BAHSI|IY_BAHSI)_\d+.*', '', content).strip()
         return content[:350]
     return ""
 
 def _extract_bekle_gec(text):
-    """ŞIMDI_AL ve GEÇME satırlarını parse et."""
     import re as _re
     simdi_al = gecme = ""
-    # Bölüm 5'i bul
     sec_m = _re.search(r'###\s*5\..*?\n(.*?)(?=###|\Z)', text, _re.S | _re.I)
     block = sec_m.group(1) if sec_m else text
     for line in block.splitlines():
@@ -3309,20 +2973,15 @@ def _extract_bekle_gec(text):
     return (simdi_al, gecme) if (simdi_al or gecme) else None
 
 def _extract_simdi_al(text):
-    """En iyi bahsi — ŞİMDİ AL satırından — ayıkla."""
     import re as _re
     m = _re.search(r'(ŞIMDI_AL|SIMDI_AL|ŞİMDİ_AL)\s*:\s*(.+?)(?:\n|$)', text, _re.I)
     if m:
         full = m.group(2).strip()
-        # Pazar adı — ilk "—" e kadar
         parts = full.split("—")
         return {"market": parts[0].strip(), "why": parts[1].strip() if len(parts) > 1 else ""}
     return None
+
 def auto_best_bet(lp, h_name, a_name, h_score, a_score, hf=None, af=None, league_code=None):
-    """
-    Olasılık tablosundan otomatik en iyi canlı bahsi seç.
-    Groq analizine gerek yok — saf istatistik.
-    """
     fv = lambda d, k, dv=0: d.get(k, dv) if d else dv
     is_ht      = lp.get("is_first_half", False)
     ht_rem     = lp.get("ht_remaining_min", 0)
@@ -3334,64 +2993,53 @@ def auto_best_bet(lp, h_name, a_name, h_score, a_score, hf=None, af=None, league
     def add(mkt, prob, why, pri):
         cands.append({"market": mkt, "prob": float(prob), "why": why, "priority": pri})
 
-    up = 5 if low else 0   # alt pazar bonusu
-    dn = 5 if low else 0   # üst pazar cezası
+    up = 5 if low else 0
+    dn = 5 if low else 0
 
-    # Ev sahibi gol atar (0.5 üst)
     pnh = lp.get("p_next_h", 0)
     if pnh >= 70:
         add(f"{h_name} Gol Atar (0.5 Üst)", pnh, f"ev baskısı %{pnh}", 1)
 
-    # Deplasman gol atar (0.5 üst)
     pna = lp.get("p_next_a", 0)
     if pna >= 70:
         add(f"{a_name} Gol Atar (0.5 Üst)", pna, f"dep atağı %{pna}", 2)
 
-    # İY 0.5 Üst
     if is_ht and ht_rem >= 5:
         v = lp.get("ht_o5", 0)
         if v >= 62 - dn:
             add("İY 0.5 Üst", v, f"İY gol gelir {ht_rem}dk kaldı %{v}", 3)
 
-    # MS 1.5 Üst
     v = lp.get("o15", 0)
     if v >= 65 - dn:
         add("MS 1.5 Üst", v, f"2+ gol bekleniyor %{v}", 4)
 
-    # MS 0.5 Üst (golsüz maç)
     if h_score + a_score == 0:
         v = lp.get("p_next_goal", 0)
         if v >= 80:
             add("MS 0.5 Üst (İlk Gol)", v, f"henüz gol yok beklenti %{v}", 5)
 
-    # MS 2.5 Üst
     v = lp.get("o25", 0)
     if v >= 65 - dn:
         add("MS 2.5 Üst", v, f"3+ gol bekleniyor %{v}", 6)
 
-    # İY 1.5 Üst
     if is_ht and ht_rem >= 8:
         v = lp.get("ht_o15", 0)
         if v >= 60 - dn:
             add("İY 1.5 Üst", v, f"İY 2+ gol %{v}", 7)
 
-    # MS 2.5 Alt (az kaldı, düşük skor)
     v = lp.get("u25", 0)
     if v >= 65 + up and ms_rem <= 55:
         add("MS 2.5 Alt", v, f"düşük gol beklentisi %{v}", 8)
 
-    # İY 0.5 Alt (az kaldı, golsüz, düşük gol ligi)
     if is_ht and ht_rem <= 10 and h_score + a_score == 0 and low:
         v = lp.get("ht_u5", 0)
         if v >= 58:
             add("İY 0.5 Alt", v, f"az kaldı golsüz %{v}", 9)
 
-    # KG VAR
     v = lp.get("p_kg_var", 0)
     if v >= 70:
         add("KG VAR", v, f"her iki takım gol atar %{v}", 10)
 
-    # İY KG VAR
     if is_ht and ht_rem >= 6:
         v = lp.get("ht_kg_var", 0)
         if v >= 62:
@@ -3400,22 +3048,16 @@ def auto_best_bet(lp, h_name, a_name, h_score, a_score, hf=None, af=None, league
     if not cands:
         return None
 
-    # %95+ olanlar zaten gerçekleşmiş → anlamsız, filtrele
-    # %50 altı çok belirsiz → filtrele
     meaningful = [c for c in cands if 52 <= c["prob"] <= 94]
     if not meaningful:
-        # Hepsi filtrelendiyse en yüksek problu non-99'u al
         meaningful = [c for c in cands if c["prob"] < 99]
     if not meaningful:
         return None
 
-    # Olasılığa göre sırala (önce yüksek prob, eşitse düşük priority)
     meaningful.sort(key=lambda x: (-x["prob"], x["priority"]))
     return meaningful[0]
 
-
 def _get_all_bets(lp, h_name, a_name, h_score, a_score, hf=None, af=None, league_code=None, live_odds=None):
-    """Olasılık + canlı oran bazlı pazar önerileri. Zaten gerçekleşmiş pazarlar hariç."""
     is_ht   = lp.get("is_first_half", False)
     ht_rem  = lp.get("ht_remaining_min", 0)
     ms_rem  = lp.get("remaining_min", 90)
@@ -3432,7 +3074,7 @@ def _get_all_bets(lp, h_name, a_name, h_score, a_score, hf=None, af=None, league
         if done_at is not None and total_g > done_at: return
         p = float(prob or 0)
         if has_odds:
-            if odd is None or float(odd) <= 1.10: return  # oran yok veya işe yaramaz
+            if odd is None or float(odd) <= 1.10: return
             imp  = 100 / float(odd)
             edge = round(p - imp, 1)
             label = f"oran {odd}" + (f" ⚡VALUE +{edge:.0f}%" if edge >= 3 else "")
@@ -3441,14 +3083,11 @@ def _get_all_bets(lp, h_name, a_name, h_score, a_score, hf=None, af=None, league
             if 55 <= p <= 90:
                 cands.append({"market":mkt,"prob":p,"odd":None,"why":why,"priority":pri,"value":0})
 
-    # h2h
     add(f"{h_name} Kazanır", lp.get("p_next_h",50)*0.7, "1 kazanır", 20, odd=h2h_o.get("1"))
     add("Beraberlik",        30,                          "beraberlik",21, odd=h2h_o.get("X"))
     add(f"{a_name} Kazanır", lp.get("p_next_a",50)*0.7, "2 kazanır", 22, odd=h2h_o.get("2"))
-    # Sonraki gol
     add(f"{h_name} Gol Atar", lp.get("p_next_h",0), "ev baskısı", 1)
     add(f"{a_name} Gol Atar", lp.get("p_next_a",0), "dep atağı",  2)
-    # Totals (oran bazlı)
     for thr_str, over_odd in totals.items():
         if "_over" not in thr_str: continue
         try: thr = float(thr_str.replace("_over",""))
@@ -3457,7 +3096,6 @@ def _get_all_bets(lp, h_name, a_name, h_score, a_score, hf=None, af=None, league
         done_thr   = int(thr - 0.5)
         add(f"{thr} Üst", lp.get(f"o{int(thr*10)}",0), f"{int(thr+0.5)}+ gol", int(thr*10)+1, done_at=done_thr, odd=over_odd)
         add(f"{thr} Alt", lp.get(f"u{int(thr*10)}",0), f"max {int(thr-0.5)} gol", int(thr*10)+2, odd=under_odd)
-    # Oran yoksa fallback
     if not has_odds:
         add("MS 1.5 Üst",lp.get("o15",0),"2+ gol",   4,done_at=0)
         add("MS 1.5 Alt",lp.get("u15",0),"max 1 gol",14)
@@ -3467,7 +3105,6 @@ def _get_all_bets(lp, h_name, a_name, h_score, a_score, hf=None, af=None, league
         add("KG VAR",    lp.get("p_kg_var",0),"her iki takım atar",11)
         if total_g == 0:
             add("İlk Gol",lp.get("p_next_goal",0),"maçta gol olur",5)
-    # İY
     if is_ht and ht_rem >= 4:
         add("İY 0.5 Üst",lp.get("ht_o5",0),   f"İY gol gelir {ht_rem}dk",3,done_at=0)
         add("İY 0.5 Alt",lp.get("ht_u5",0),   "İY gol gelmez",           12)
@@ -3484,11 +3121,6 @@ def _get_all_bets(lp, h_name, a_name, h_score, a_score, hf=None, af=None, league
             result.append(c)
     return result[:6]
 
-
-
-
-# ── VS UI ── (mevcut render_vs_ui burada)
-
 def render_vs_ui(match, hf, af, h2h, hxg, axg, h_htxg, a_htxg,
                  stats, top_ms, top_ht, h_stand, a_stand, h_sc, a_sc,
                  analysis_text, odds_analysis=None):
@@ -3499,7 +3131,6 @@ def render_vs_ui(match, hf, af, h2h, hxg, axg, h_htxg, a_htxg,
     fv  = lambda d,k,dv=0: d.get(k,dv) if d else dv
     hs  = h_stand or {}; as_ = a_stand or {}
 
-    # ── 1. VS BAŞLIK ─────────────────────────────────────────
     st.markdown(f"""
 <div class="vs-wrapper">
   <div class="vs-header">
@@ -3521,7 +3152,6 @@ def render_vs_ui(match, hf, af, h2h, hxg, axg, h_htxg, a_htxg,
   </div>
 """, unsafe_allow_html=True)
 
-    # ── 2. XG BARI ───────────────────────────────────────────
     total_xg = hxg + axg
     h_pct = round(hxg / total_xg * 100) if total_xg > 0 else 50
     a_pct = 100 - h_pct
@@ -3545,7 +3175,6 @@ def render_vs_ui(match, hf, af, h2h, hxg, axg, h_htxg, a_htxg,
   </div>
 """, unsafe_allow_html=True)
 
-    # ── 3. PUAN DURUMU VS ────────────────────────────────────
     def better(hv, av, higher_is_better=True):
         if hv == av: hc, ac = "equal","equal"
         elif (hv > av) == higher_is_better: hc, ac = "better","worse"
@@ -3575,7 +3204,6 @@ def render_vs_ui(match, hf, af, h2h, hxg, axg, h_htxg, a_htxg,
   <div class="vc-label">{lbl}</div>
   <div class="vc-away"><span class="vc-val {ac}">{av}</span></div>
 </div>"""
-    # Golcü satırı
     vc_html += f"""
 <div class="vc-row">
   <div class="vc-home"><span style="font-size:.72rem;color:#2563eb">{h_sc_str}</span></div>
@@ -3585,10 +3213,8 @@ def render_vs_ui(match, hf, af, h2h, hxg, axg, h_htxg, a_htxg,
     vc_html += "</div>"
     st.markdown(vc_html, unsafe_allow_html=True)
 
-    # ── 4. FORM & İSTATİSTİK VS ──────────────────────────────
     dp_html = '<div class="data-panel">'
 
-    # Ev sahibi sütunu
     def form_badges_html(form_list):
         html = '<div class="form-badges">'
         for r in form_list[:8]:
@@ -3617,7 +3243,6 @@ def render_vs_ui(match, hf, af, h2h, hxg, axg, h_htxg, a_htxg,
         else:
             return "good" if val <= good_thresh else "bad" if val >= bad_thresh else ""
 
-    # Ev sahibi form verileri
     h_stat_rows = [
         ("Maç Sayısı", fv(hf,"n"), ""),
         ("Form Puanı", f"{fv(hf,'pts5')}/15 (%{fv(hf,'pts_pct')})",
@@ -3639,7 +3264,6 @@ def render_vs_ui(match, hf, af, h2h, hxg, axg, h_htxg, a_htxg,
         ("Seri", fv(hf,"streak","?"), "warn"),
     ]
 
-    # Deplasman form verileri
     a_stat_rows = [
         ("Maç Sayısı", fv(af,"n"), ""),
         ("Form Puanı", f"{fv(af,'pts5')}/15 (%{fv(af,'pts_pct')})",
@@ -3680,7 +3304,6 @@ def render_vs_ui(match, hf, af, h2h, hxg, axg, h_htxg, a_htxg,
     dp_html += "</div>"
     st.markdown(dp_html, unsafe_allow_html=True)
 
-    # ── 5. H2H PANEL ─────────────────────────────────────────
     if h2h.get("n",0) > 0:
         h2h_html = f"""
 <div class="h2h-panel">
@@ -3724,7 +3347,6 @@ def render_vs_ui(match, hf, af, h2h, hxg, axg, h_htxg, a_htxg,
 """
         st.markdown(h2h_html, unsafe_allow_html=True)
 
-    # ── 6. OLASILİK — MS 1/X/2 ───────────────────────────────
     fav_ms = max(stats['p1'], stats['px'], stats['p2'])
     h_cls  = "fav-home" if stats['p1']==fav_ms else "default"
     x_cls  = "fav-draw" if stats['px']==fav_ms else "default"
@@ -3771,7 +3393,6 @@ def render_vs_ui(match, hf, af, h2h, hxg, axg, h_htxg, a_htxg,
 </div>
 """, unsafe_allow_html=True)
 
-    # ── 7. GOL METRİKLERİ ────────────────────────────────────
     def gol_cls(v):
         if v >= 65: return "high"
         if v >= 45: return "mid"
@@ -3815,7 +3436,6 @@ def render_vs_ui(match, hf, af, h2h, hxg, axg, h_htxg, a_htxg,
 </div>
 """, unsafe_allow_html=True)
 
-    # ── 8. SKOR DAĞILIMI ─────────────────────────────────────
     st.markdown('<div class="skor-panel"><div class="dp-section-title">EN OLASILIKLI MS SKORLARI</div>',
                 unsafe_allow_html=True)
     skor_html = '<div class="skor-grid">'
@@ -3832,7 +3452,6 @@ def render_vs_ui(match, hf, af, h2h, hxg, axg, h_htxg, a_htxg,
     iy_html += "</div></div>"
     st.markdown(iy_html, unsafe_allow_html=True)
 
-    # ── 9. İY/MS KOMBOLAR ────────────────────────────────────
     st.markdown('<div class="combo-panel"><div class="combo-title">İY/MS KOMBİNASYONLARI — 9 Senaryo</div>',
                 unsafe_allow_html=True)
     combo_html = '<div class="combo-grid">'
@@ -3848,13 +3467,10 @@ def render_vs_ui(match, hf, af, h2h, hxg, axg, h_htxg, a_htxg,
     combo_html += "</div></div>"
     st.markdown(combo_html, unsafe_allow_html=True)
 
-    # ── 10. DÖNÜŞ ANALİZİ ────────────────────────────────────
-    # ── 10. DÖNÜŞ ANALİZİ — Python ile oluştur (tag güvenliği) ──
     rev21_m = stats['rev21']; rev21_h = h2h.get('rev21_pct',0)
     rev12_m = stats['rev12']; rev12_h = h2h.get('rev12_pct',0)
     hot21 = rev21_m > 10 or rev21_h > 20
     hot12 = rev12_m > 10 or rev12_h > 20
-    # Yeni format bölüm 3 içinden 2/1 ve 1/2 blokları çek
     def _find_sec(secs_dict, *keywords):
         for k, v in secs_dict.items():
             k_norm = k.upper().replace("İ","I").replace("Ö","O").replace("Ü","U").replace("Ş","S").replace("Ç","C").replace("/","").replace("-","")
@@ -3924,132 +3540,155 @@ def render_vs_ui(match, hf, af, h2h, hxg, axg, h_htxg, a_htxg,
         unsafe_allow_html=True
     )
 
-
-    # ── 11b. GERÇEK VERİYE DAYALI SKOR TABLOSU ──────────────
-    # İY skorları: Poisson + gerçek frekans birleşimi
     def _build_iy_scores(hform, aform, ht_top):
-    from collections import defaultdict
- 
-    h_htxg = hform.get("ht_avg_gf", 0.5) if hform else 0.5
-    a_htxg = aform.get("ht_avg_gf", 0.5) if aform else 0.5
-    h_n    = hform.get("n", 1) if hform else 1
-    a_n    = aform.get("n", 1) if aform else 1
- 
-    h_ht_freq = hform.get("ht_score_freq", {}) if hform else {}
-    a_ht_freq = aform.get("ht_score_freq", {}) if aform else {}
- 
-    # Dinamik ağırlık — maç sayısı arttıkça form daha güvenilir
-    def form_weight(n_matches):
-        """n≤5 → 0.20, n=8 → 0.30, n≥12 → 0.40 max"""
-        return min(0.40, max(0.20, n_matches / 30))
- 
-    h_fw = form_weight(h_n)
-    a_fw = form_weight(a_n)
-    poi_w = 1.0 - (h_fw + a_fw) / 2   # Poisson ağırlığı her zaman ≥ 0.60
- 
-    # Poisson skorları temel al
-    scores = {}
-    for (hg, ag), prob in ht_top[:12]:
-        scores[f"{hg}-{ag}"] = {"pct": round(prob, 1), "why": ""}
- 
-    # Ev sahibi form frekansı — min 2 kez çıkmış olmalı
-    for sc, info in h_ht_freq.items():
-        if info.get("count", 0) < 2:
-            continue
-        if sc in scores:
-            combined = round(scores[sc]["pct"] * (1 - h_fw) + info["pct"] * h_fw, 1)
-            scores[sc] = {"pct": combined, "why": f"Ev {info['count']}x"}
-        else:
-            scores[sc] = {"pct": round(info["pct"] * h_fw, 1),
-                          "why": f"Ev {info['count']}x"}
- 
-    # Deplasman form frekansı — perspektif çevir, min 2 kez
-    for sc, info in a_ht_freq.items():
-        if info.get("count", 0) < 2:
-            continue
-        parts = sc.split("-")
-        if len(parts) == 2:
-            rev_sc = f"{parts[1]}-{parts[0]}"
-            if rev_sc in scores:
-                combined = round(scores[rev_sc]["pct"] * (1 - a_fw) + info["pct"] * a_fw, 1)
-                old_why  = scores[rev_sc].get("why", "")
-                scores[rev_sc] = {"pct": combined,
-                                  "why": f"{old_why} | Dep {info['count']}x".strip(" |")}
-            else:
-                scores[rev_sc] = {"pct": round(info["pct"] * a_fw, 1),
-                                  "why": f"Dep {info['count']}x"}
- 
-    # Makulsüz filtrele
-    filtered = {}
-    for sc, info in scores.items():
-        parts = sc.split("-")
-        if len(parts) != 2:
-            continue
-        try:
-            hg, ag = int(parts[0]), int(parts[1])
-        except:
-            continue
-        if hg + ag >= 3 and h_htxg + a_htxg < 1.5:
-            continue
-        if hg > 0 and ag > 0 and h_htxg < 0.3 and a_htxg < 0.3:
-            continue
-        filtered[sc] = info
- 
-    sorted_scores = sorted(filtered.items(), key=lambda x: -x[1]["pct"])
-    return [{"score": sc, "pct": str(info["pct"]), "why": info.get("why", "")}
-            for sc, info in sorted_scores[:6] if info["pct"] >= 0.5]
- 
- 
-def _build_ms_scores(hform, aform, ms_top):
-    h_avg_gf = hform.get("avg_gf", 1.2) if hform else 1.2
-    a_avg_gf = aform.get("avg_gf", 1.0) if aform else 1.0
-    h_n      = hform.get("n", 1) if hform else 1
-    a_n      = aform.get("n", 1) if aform else 1
- 
-    h_ms_freq = hform.get("ms_score_freq", {}) if hform else {}
-    a_ms_freq = aform.get("ms_score_freq", {}) if aform else {}
- 
-    def form_weight(n_matches):
-        return min(0.40, max(0.20, n_matches / 30))
- 
-    h_fw = form_weight(h_n)
-    a_fw = form_weight(a_n)
- 
-    scores = {}
-    for (hg, ag), prob in ms_top[:12]:
-        scores[f"{hg}-{ag}"] = {"pct": round(prob, 1), "why": ""}
- 
-    # Min 2 kez çıkmış form skorları
-    for sc, info in h_ms_freq.items():
-        if info.get("count", 0) < 2:
-            continue
-        if sc in scores:
-            combined = round(scores[sc]["pct"] * (1 - h_fw) + info["pct"] * h_fw, 1)
-            scores[sc] = {"pct": combined, "why": f"Ev {info['count']}x"}
-        elif info["pct"] >= 5:
-            scores[sc] = {"pct": round(info["pct"] * h_fw, 1),
-                          "why": f"Ev {info['count']}x"}
- 
-    for sc, info in a_ms_freq.items():
-        if info.get("count", 0) < 2:
-            continue
-        parts = sc.split("-")
-        if len(parts) == 2:
-            rev_sc = f"{parts[1]}-{parts[0]}"
-            if rev_sc in scores:
-                old = scores[rev_sc]
-                combined = round(old["pct"] * (1 - a_fw) + info["pct"] * a_fw, 1)
-                scores[rev_sc] = {"pct": combined,
-                                  "why": f"{old.get('why','')} Dep {info['count']}x".strip()}
-            elif info["pct"] >= 5:
-                scores[rev_sc] = {"pct": round(info["pct"] * a_fw, 1),
-                                  "why": f"Dep {info['count']}x"}
- 
-    sorted_s = sorted(scores.items(), key=lambda x: -x[1]["pct"])
-    return [{"score": sc, "pct": str(round(info["pct"], 1)), "why": info.get("why", "")}
-            for sc, info in sorted_s[:8] if info["pct"] >= 1.0]
+        from collections import defaultdict
 
-    # ── 12. TAVSİYELER ────────────────────────────────────────
+        h_htxg = hform.get("ht_avg_gf", 0.5) if hform else 0.5
+        a_htxg = aform.get("ht_avg_gf", 0.5) if aform else 0.5
+        h_n    = hform.get("n", 1) if hform else 1
+        a_n    = aform.get("n", 1) if aform else 1
+
+        h_ht_freq = hform.get("ht_score_freq", {}) if hform else {}
+        a_ht_freq = aform.get("ht_score_freq", {}) if aform else {}
+
+        def form_weight(n_matches):
+            return min(0.40, max(0.20, n_matches / 30))
+
+        h_fw = form_weight(h_n)
+        a_fw = form_weight(a_n)
+        poi_w = 1.0 - (h_fw + a_fw) / 2
+
+        scores = {}
+        for (hg, ag), prob in ht_top[:12]:
+            scores[f"{hg}-{ag}"] = {"pct": round(prob, 1), "why": ""}
+
+        for sc, info in h_ht_freq.items():
+            if info.get("count", 0) < 2:
+                continue
+            if sc in scores:
+                combined = round(scores[sc]["pct"] * (1 - h_fw) + info["pct"] * h_fw, 1)
+                scores[sc] = {"pct": combined, "why": f"Ev {info['count']}x"}
+            else:
+                scores[sc] = {"pct": round(info["pct"] * h_fw, 1),
+                              "why": f"Ev {info['count']}x"}
+
+        for sc, info in a_ht_freq.items():
+            if info.get("count", 0) < 2:
+                continue
+            parts = sc.split("-")
+            if len(parts) == 2:
+                rev_sc = f"{parts[1]}-{parts[0]}"
+                if rev_sc in scores:
+                    combined = round(scores[rev_sc]["pct"] * (1 - a_fw) + info["pct"] * a_fw, 1)
+                    old_why  = scores[rev_sc].get("why", "")
+                    scores[rev_sc] = {"pct": combined,
+                                      "why": f"{old_why} | Dep {info['count']}x".strip(" |")}
+                else:
+                    scores[rev_sc] = {"pct": round(info["pct"] * a_fw, 1),
+                                      "why": f"Dep {info['count']}x"}
+
+        filtered = {}
+        for sc, info in scores.items():
+            parts = sc.split("-")
+            if len(parts) != 2:
+                continue
+            try:
+                hg, ag = int(parts[0]), int(parts[1])
+            except:
+                continue
+            if hg + ag >= 3 and h_htxg + a_htxg < 1.5:
+                continue
+            if hg > 0 and ag > 0 and h_htxg < 0.3 and a_htxg < 0.3:
+                continue
+            filtered[sc] = info
+
+        sorted_scores = sorted(filtered.items(), key=lambda x: -x[1]["pct"])
+        return [{"score": sc, "pct": str(info["pct"]), "why": info.get("why", "")}
+                for sc, info in sorted_scores[:6] if info["pct"] >= 0.5]
+
+    def _build_ms_scores(hform, aform, ms_top):
+        h_avg_gf = hform.get("avg_gf", 1.2) if hform else 1.2
+        a_avg_gf = aform.get("avg_gf", 1.0) if aform else 1.0
+        h_n      = hform.get("n", 1) if hform else 1
+        a_n      = aform.get("n", 1) if aform else 1
+
+        h_ms_freq = hform.get("ms_score_freq", {}) if hform else {}
+        a_ms_freq = aform.get("ms_score_freq", {}) if aform else {}
+
+        def form_weight(n_matches):
+            return min(0.40, max(0.20, n_matches / 30))
+
+        h_fw = form_weight(h_n)
+        a_fw = form_weight(a_n)
+
+        scores = {}
+        for (hg, ag), prob in ms_top[:12]:
+            scores[f"{hg}-{ag}"] = {"pct": round(prob, 1), "why": ""}
+
+        for sc, info in h_ms_freq.items():
+            if info.get("count", 0) < 2:
+                continue
+            if sc in scores:
+                combined = round(scores[sc]["pct"] * (1 - h_fw) + info["pct"] * h_fw, 1)
+                scores[sc] = {"pct": combined, "why": f"Ev {info['count']}x"}
+            elif info["pct"] >= 5:
+                scores[sc] = {"pct": round(info["pct"] * h_fw, 1),
+                              "why": f"Ev {info['count']}x"}
+
+        for sc, info in a_ms_freq.items():
+            if info.get("count", 0) < 2:
+                continue
+            parts = sc.split("-")
+            if len(parts) == 2:
+                rev_sc = f"{parts[1]}-{parts[0]}"
+                if rev_sc in scores:
+                    old = scores[rev_sc]
+                    combined = round(old["pct"] * (1 - a_fw) + info["pct"] * a_fw, 1)
+                    scores[rev_sc] = {"pct": combined,
+                                      "why": f"{old.get('why','')} Dep {info['count']}x".strip()}
+                elif info["pct"] >= 5:
+                    scores[rev_sc] = {"pct": round(info["pct"] * a_fw, 1),
+                                      "why": f"Dep {info['count']}x"}
+
+        sorted_s = sorted(scores.items(), key=lambda x: -x[1]["pct"])
+        return [{"score": sc, "pct": str(round(info["pct"], 1)), "why": info.get("why", "")}
+                for sc, info in sorted_s[:8] if info["pct"] >= 1.0]
+
+    iy_scores_combined = _build_iy_scores(hf, af, top_ht)
+    ms_scores_combined = _build_ms_scores(hf, af, top_ms_shape if "top_ms_shape" in dir() else top_ms)
+
+    if iy_scores_combined:
+        st.markdown("""
+<div class="skor-panel">
+  <div class="dp-section-title">📊 GERÇEK SKOR DAĞILIMI — Form + Poisson Kombine</div>
+""", unsafe_allow_html=True)
+        cols_i = st.columns(len(iy_scores_combined[:6]))
+        for col, sc in zip(cols_i, iy_scores_combined[:6]):
+            with col:
+                st.markdown(f"""
+<div style="background:#111f35;border:1px solid #1c2e44;border-radius:6px;padding:6px 3px;text-align:center">
+  <div style="font-size:1rem;font-weight:800;color:#a8c4d8;font-family:JetBrains Mono,monospace">{sc['score']}</div>
+  <div style="font-size:.58rem;color:#4a6880">%{sc['pct']}</div>
+  <div style="font-size:.5rem;color:#2a3a4a">{sc['why'][:25]}</div>
+</div>""", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    if ms_scores_combined:
+        st.markdown("""
+<div class="skor-panel">
+  <div class="dp-section-title">📊 MS GERÇEK SKOR DAĞILIMI — Form + Poisson Kombine</div>
+""", unsafe_allow_html=True)
+        cols_m = st.columns(len(ms_scores_combined[:8]))
+        for col, sc in zip(cols_m, ms_scores_combined[:8]):
+            with col:
+                st.markdown(f"""
+<div style="background:#111f35;border:1px solid #1c2e44;border-radius:6px;padding:6px 3px;text-align:center">
+  <div style="font-size:1rem;font-weight:800;color:#a8c4d8;font-family:JetBrains Mono,monospace">{sc['score']}</div>
+  <div style="font-size:.58rem;color:#4a6880">%{sc['pct']}</div>
+  <div style="font-size:.5rem;color:#2a3a4a">{sc['why'][:25]}</div>
+</div>""", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
     banko  = preds.get("BANKO","")
     orta   = preds.get("ORTA","")
     risky  = preds.get("RISKI", preds.get("RISKL", preds.get("SURPR", preds.get("RİSKLİ",""))))
@@ -4092,11 +3731,11 @@ def _build_ms_scores(hform, aform, ms_top):
     <div class="pp">{skor[:120]}</div>
   </div>
 </div>"""
-    # İY/MS skor kombinasyon kutuları
     if secs.get("SKOR","") or preds.get("SKOR",""):
         skor_val = preds.get("SKOR","") or ""
-        iy_match = __import__("re").search(r"İY\s*(\d-\d)", skor_val, __import__("re").I)
-        ms_match = __import__("re").search(r"MS\s*(\d-\d)", skor_val, __import__("re").I)
+        import re
+        iy_match = re.search(r"İY\s*(\d-\d)", skor_val, re.I)
+        ms_match = re.search(r"MS\s*(\d-\d)", skor_val, re.I)
         def _score_str(val):
             if isinstance(val, tuple): return f"{val[0]}-{val[1]}"
             return str(val) if val else "?"
@@ -4122,14 +3761,12 @@ def _build_ms_scores(hform, aform, ms_top):
     tav_html += "</div>"
     st.markdown(tav_html, unsafe_allow_html=True)
 
-    # ── 13. MAÇ ANALİZİ METNİ ────────────────────────────────
     analiz_text = ""
     for k, v in secs.items():
         k_norm = k.replace("İ","I").replace("Ş","S").replace("Ü","U").replace("Ö","O").replace("Ç","C")
         if any(x in k_norm for x in ["GENEL MAC", "GENEL MAÇ", "GENEL ANALIZ", "SON YORUM", "PROFESYONEL SON", "PROFESYONEL MAC"]):
             analiz_text = v; break
     if not analiz_text:
-        # Fallback: "ANALIZ" içeren herhangi bir section
         for k, v in secs.items():
             if "ANALIZ" in k.replace("İ","I").replace("Ş","S").replace("Ü","U").replace("Ö","O").replace("Ç","C"):
                 analiz_text = v; break
@@ -4144,8 +3781,7 @@ def _build_ms_scores(hform, aform, ms_top):
     st.markdown('<div class="disclaimer">⚠️ DISCLAIMER — İstatistikler bilgilendirme amaçlıdır. Kesinlik içermez.</div>',
                 unsafe_allow_html=True)
 
-    # Tam analizi indirme
-    st.markdown("</div>", unsafe_allow_html=True)  # vs-wrapper kapat
+    st.markdown("</div>", unsafe_allow_html=True)
     st.download_button("⬇️ Tam Analizi İndir (.txt)", data=analysis_text,
                        file_name=f"{h}_vs_{a}_{sel_date}.txt",
                        mime="text/plain", key=f"dl_{h[:4]}_{a[:4]}")
@@ -4157,7 +3793,6 @@ for k in ["matches","mdata","analyses","patterns"]:
     if k not in st.session_state:
         st.session_state[k] = [] if k=="matches" else {}
 
-# Canlı maç state
 for k in ["live_matches","live_analyses","live_stats_cache"]:
     if k not in st.session_state:
         st.session_state[k] = {}
@@ -4167,7 +3802,6 @@ for k in ["live_matches","live_analyses","live_stats_cache"]:
 # ══════════════════════════════════════════════════════════════════
 if app_mode == "🔴 Canlı Maçlar":
 
-    # ── BAŞLIK ───────────────────────────────────────────────────
     st.markdown("""
 <div class="live-header" style="margin-bottom:.8rem">
   <div class="live-dot"></div>
@@ -4175,7 +3809,6 @@ if app_mode == "🔴 Canlı Maçlar":
   <span class="live-title">Gerçek Zamanlı Gol Bahis Rehberi</span>
 </div>""", unsafe_allow_html=True)
 
-    # ── KONTROLLER ───────────────────────────────────────────────
     lc1, lc2, lc3, lc4 = st.columns([2,2,2,2])
     with lc1:
         live_league = st.selectbox("Lig", ["Tüm Ligler","PL","PD","BL1","SA","FL1","CL","EL"], key="live_league_sel")
@@ -4188,13 +3821,11 @@ if app_mode == "🔴 Canlı Maçlar":
 
     st.divider()
 
-    # ── MAÇLARI ÇEK ──────────────────────────────────────────────
     if live_refresh_btn or live_auto:
         code_filter = None if live_league == "Tüm Ligler" else live_league
         with st.spinner("📡 Canlı maçlar çekiliyor..."):
             live_ms = api_live_matches(code_filter)
 
-        # Bitmiş maçları temizle
         current_live_ids = {lm["id"] for lm in live_ms}
         for sid in [k for k in st.session_state["live_matches"] if k not in current_live_ids]:
             st.session_state["live_matches"].pop(sid, None)
@@ -4220,7 +3851,6 @@ if app_mode == "🔴 Canlı Maçlar":
                     hff, aff, h2hf = st.session_state[fk]
                 st.session_state["live_matches"][lid] = {"match": lm, "hf": hff, "af": aff, "h2h": h2hf}
 
-    # ── TÜMÜNÜ ANALİZ ET ─────────────────────────────────────────
     if live_analyze_all_btn and st.session_state["live_matches"]:
         total = len(st.session_state["live_matches"])
         bar   = st.progress(0)
@@ -4248,7 +3878,6 @@ if app_mode == "🔴 Canlı Maçlar":
         st.success("✅ Tüm analizler hazır!")
         st.rerun()
 
-    # ── MAÇLAR YOK ───────────────────────────────────────────────
     if not st.session_state["live_matches"]:
         st.markdown("""
 <div style="background:#0d1829;border:1px solid #1c2e44;border-radius:10px;
@@ -4256,10 +3885,7 @@ padding:2rem;text-align:center;color:#4a6880;font-size:.82rem">
   🔴 <b style="color:#d0dce8">Canlı Maçları Çek</b> butonuna bas, ardından <b style="color:#d0dce8">Tümünü Analiz Et</b>
 </div>""", unsafe_allow_html=True)
     else:
-        # ── GÜVEN SKORUNA GÖRE SIRALA ─────────────────────────────
-        # Her analiz için en iyi bahsi bul ve güven skorunu hesapla
         def _confidence_score(analysis_text):
-            """YÜKSEK=3, ORTA=2, DÜŞÜK=1 — en yüksek başa"""
             if not analysis_text: return 0
             import re as _re
             vals = _re.findall(r'GÜVENİLİRLİK\s*:\s*(\w+)', analysis_text, _re.I)
@@ -4277,8 +3903,6 @@ padding:2rem;text-align:center;color:#4a6880;font-size:.82rem">
             reverse=True
         )
 
-        # ── EN İYİ TAVSİYE BANNER ────────────────────────────────
-        # auto_best_bet ile her maçtan en iyi bahsi bul, olasılıkla sırala
         all_picks = []
         for lid, ld in sorted_matches:
             lm_   = ld["match"]
@@ -4293,7 +3917,7 @@ padding:2rem;text-align:center;color:#4a6880;font-size:.82rem">
             _lo=get_live_match_odds(ODDS_API_KEY_DEFAULT,_sk,lm_["homeTeam"]["name"],lm_["awayTeam"]["name"]) if _sk else None
             match_bets = _get_all_bets(lp_, lm_["homeTeam"]["name"], lm_["awayTeam"]["name"],
                                         lhsc_, lasc_, ld["hf"], ld["af"], league_code=lc_, live_odds=_lo)
-            for bp in match_bets[:2]:  # Her maçtan max 2 tavsiye
+            for bp in match_bets[:2]:
                 all_picks.append({
                     "lid": lid, "lm": lm_, "lp": lp_,
                     "match": f"{lm_['homeTeam']['name']} vs {lm_['awayTeam']['name']}",
@@ -4306,8 +3930,7 @@ padding:2rem;text-align:center;color:#4a6880;font-size:.82rem">
         top_pick = all_picks[0] if all_picks else None
 
         if top_pick:
-            # Tüm aktif tavsiyeleri üst bannerda göster
-            banner_items = all_picks[:4]  # max 4 tavsiye
+            banner_items = all_picks[:4]
             items_html = ""
             for i, bp in enumerate(banner_items):
                 prob_color = "#3ecf7a" if bp["prob"] >= 75 else "#f5a623"
@@ -4340,7 +3963,6 @@ padding:1rem 1.2rem;margin-bottom:1rem">
   </div>
 </div>""", unsafe_allow_html=True)
 
-        # ── HER MAÇ PANELİ ────────────────────────────────────────
         for lid, ld in sorted_matches:
             lm   = ld["match"]
             lhn  = lm["homeTeam"]["name"]
@@ -4351,14 +3973,12 @@ padding:1rem 1.2rem;margin-bottom:1rem">
             done = lid in st.session_state["live_analyses"]
             cscore = _confidence_score(st.session_state["live_analyses"].get(lid,""))
 
-            # Confidence badge
             conf_badge = "🟢 YÜKSEK" if cscore >= 6 else ("🟡 ORTA" if cscore >= 3 else ("🔴 DÜŞÜK" if done else ""))
 
             with st.expander(
                 f"🔴 {lhn} {lhsc}–{lasc} {lan}  ·  {lmin}'  {conf_badge}",
-                expanded=True  # hepsi açık
+                expanded=True
             ):
-                # SofaScore istatistik
                 ss_ev, ss_raw = fetch_sofascore_live_event(lhn, lan)
                 live_stats    = parse_live_stats(ss_raw)
 
@@ -4375,14 +3995,10 @@ padding:1rem 1.2rem;margin-bottom:1rem">
                 if done:
                     atxt = st.session_state["live_analyses"][lid]
 
-                    # ŞİMDİ AL banner (maç içinde) — auto_best_bet kullan
                     lc_tmp = live_league if live_league != "Tüm Ligler" else None
                     auto_pick = auto_best_bet(lp, lhn, lan, lhsc, lasc, ld["hf"], ld["af"], league_code=lc_tmp)
                     groq_pick = _extract_simdi_al(atxt)
-                    # İkisini karşılaştır: hangisi daha yüksek olasılıklı
-                    display_pick = auto_pick
                     if groq_pick and groq_pick.get("market"):
-                        # Groq'un verdiği pazar auto_pick'ten farklıysa ikisini de göster
                         if auto_pick and auto_pick["market"] != groq_pick["market"]:
                             st.markdown(f"""
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:.6rem">
@@ -4397,8 +4013,6 @@ padding:1rem 1.2rem;margin-bottom:1rem">
     <div style="font-size:.6rem;color:#4a6880">{groq_pick.get('why','')[:60]}</div>
   </div>
 </div>""", unsafe_allow_html=True)
-                            display_pick = None  # İkisi zaten gösterildi
-                    # Tüm anlamlı pazarları hesapla ve sıralı göster
                     lc_tmp2 = live_league if live_league != "Tüm Ligler" else None
                     _sk2=FD_TO_ODDSAPI_SPORT.get(lc_tmp2 or "","")
                     _lo2=get_live_match_odds(ODDS_API_KEY_DEFAULT,_sk2,lhn,lan) if _sk2 else None
@@ -4427,20 +4041,18 @@ padding:1rem 1.2rem;margin-bottom:1rem">
                             + rows_html + '</div>',
                             unsafe_allow_html=True
                         )
-                    elif display_pick:
+                    elif auto_pick:
                         st.markdown(f"""
 <div style="background:#04180a;border:1px solid #3ecf7a;border-radius:8px;
 padding:.6rem 1rem;margin-bottom:.6rem;display:flex;align-items:center;gap:10px">
   <span style="font-size:.56rem;font-weight:800;letter-spacing:.12em;color:#3ecf7a;text-transform:uppercase">ŞİMDİ AL</span>
-  <span style="font-size:.9rem;font-weight:800;color:#d0dce8;font-family:JetBrains Mono,monospace">{display_pick['market']}</span>
-  <span style="font-size:.68rem;color:#4a6880;flex:1">{display_pick.get('why','')}</span>
-  <span style="background:#3ecf7a;color:#04180a;font-size:.68rem;font-weight:800;padding:3px 9px;border-radius:4px">%{display_pick["prob"]:.0f}</span>
+  <span style="font-size:.9rem;font-weight:800;color:#d0dce8;font-family:JetBrains Mono,monospace">{auto_pick['market']}</span>
+  <span style="font-size:.68rem;color:#4a6880;flex:1">{auto_pick.get('why','')}</span>
+  <span style="background:#3ecf7a;color:#04180a;font-size:.68rem;font-weight:800;padding:3px 9px;border-radius:4px">%{auto_pick['prob']:.0f}</span>
 </div>""", unsafe_allow_html=True)
 
-                    # Tam analiz paneli
                     render_live_match(lm, live_stats, lp, atxt, ld["hf"], ld["af"], ld["h2h"])
 
-                    # Güncelle butonu
                     if st.button("🔄 Güncelle", key=f"live_upd_{lid}", use_container_width=False):
                         with st.spinner("🦙 Güncelleniyor..."):
                             prompt = build_live_prompt(lhn, lan, minute_int, lhsc, lasc, ht_h, ht_a,
@@ -4448,7 +4060,6 @@ padding:.6rem 1rem;margin-bottom:.6rem;display:flex;align-items:center;gap:10px"
                             st.session_state["live_analyses"][lid] = groq_call(prompt)
                         st.rerun()
                 else:
-                    # Analiz yok — özet istatistik + analiz butonu
                     ca, cb = st.columns([4,1])
                     with ca:
                         st.caption(
@@ -4487,31 +4098,43 @@ if fetch_btn:
     with st.spinner("📡 Maçlar çekiliyor..."):
         matches = api_matches(sel_code, sel_date.strftime("%Y-%m-%d"), max_match)
     if not matches:
-        st.error(f"**{sel_date:%d.%m.%Y} · {sel_label}** için planlanmış maç bulunamadı."); st.stop()
-    st.session_state.matches=matches; st.session_state.mdata={}; st.session_state.analyses={}
+        st.error(f"**{sel_date:%d.%m.%Y} · {sel_label}** için planlanmış maç bulunamadı.")
+        st.stop()
+    st.session_state.matches=matches
+    st.session_state.mdata={}
+    st.session_state.analyses={}
     st.success(f"✅ {len(matches)} maç!")
     with st.spinner("📊 Lig verileri..."):
-        standings=api_standings(sel_code); scorers=api_scorers(sel_code); time.sleep(0.5)
+        standings=api_standings(sel_code)
+        scorers=api_scorers(sel_code)
+        time.sleep(0.5)
     bar=st.progress(0)
     for i,m in enumerate(matches):
-        mid=m["id"]; hid=m["homeTeam"]["id"]; aid=m["awayTeam"]["id"]
-        hn=m["homeTeam"]["name"]; an=m["awayTeam"]["name"]
+        mid=m["id"]
+        hid=m["homeTeam"]["id"]
+        aid=m["awayTeam"]["id"]
+        hn=m["homeTeam"]["name"]
+        an=m["awayTeam"]["name"]
         bar.progress(i/len(matches),text=f"({i+1}/{len(matches)}) {hn} – {an}")
         hf=parse_form(api_team_matches(hid,n_form),hid)
-        af=parse_form(api_team_matches(aid,n_form),aid); time.sleep(0.4)
-        h2h=parse_h2h(api_h2h(mid,n_h2h),hid); time.sleep(0.4)
-        h_s=find_standing(standings,hid); a_s=find_standing(standings,aid)
-        h_sc=find_scorer(scorers,hid);   a_sc=find_scorer(scorers,aid)
-        hxg=calc_xg(hf,af,True); axg=calc_xg(af,hf,False)
-        h_htxg=calc_ht_xg(hf,hxg); a_htxg=calc_ht_xg(af,axg)
-        ms_mat=score_mat(hxg,axg); ht_mat=score_mat(h_htxg,a_htxg,mx=4)
+        af=parse_form(api_team_matches(aid,n_form),aid)
+        time.sleep(0.4)
+        h2h=parse_h2h(api_h2h(mid,n_h2h),hid)
+        time.sleep(0.4)
+        h_s=find_standing(standings,hid)
+        a_s=find_standing(standings,aid)
+        h_sc=find_scorer(scorers,hid)
+        a_sc=find_scorer(scorers,aid)
+        hxg=calc_xg(hf,af,True)
+        axg=calc_xg(af,hf,False)
+        h_htxg=calc_ht_xg(hf,hxg)
+        a_htxg=calc_ht_xg(af,axg)
+        ms_mat=score_mat(hxg,axg)
+        ht_mat=score_mat(h_htxg,a_htxg,mx=4)
         stats=compute_stats(ms_mat,ht_mat)
         top_ms=sorted(ms_mat.items(),key=lambda x:-x[1])[:12]
         top_ht=sorted(ht_mat.items(),key=lambda x:-x[1])[:6]
-        # prompt aşağıda odds ile birlikte oluşturuluyor
-        # ── Otomatik oran çekme ──────────────────────────────
         oa = None
-        # ── Otomatik oran çekme (The Odds API → fdcouk fallback) ──
         matched_odds = None
         if auto_odds:
             _match_date = m.get("utcDate","")[:10]
@@ -4534,23 +4157,22 @@ if fetch_btn:
             oa = analyze_odds(manual_o1, manual_ox, manual_o2, stats, hn, an)
             oa["_source"] = "manuel"
         else:
-            # Hiçbir oran kaynağı bulunamadı → Groq ile tahmin et
             est = estimate_odds_with_groq(hn, an, stats, hf, af, h2h, h_s, a_s)
             if est:
                 oa = analyze_odds(est["o1"], est["ox"], est["o2"], stats, hn, an)
                 oa["_source"] = est["source"]
 
-        # ── Pattern arama (otomatik) ─────────────────────────
         pattern_data = None
         _couk = FD_ORG_TO_COUK.get(sel_code)
         if _couk and oa:
-            o1_v = oa["o1"]; ox_v = oa["ox"]; o2_v = oa["o2"]
+            o1_v = oa["o1"]
+            ox_v = oa["ox"]
+            o2_v = oa["o2"]
             pattern_data, total_rows = auto_pattern_search(
                 _couk, o1_v, ox_v, o2_v,
                 n_seasons=n_seasons, tol=tolerance
             )
 
-        # Prompt'u oluştur
         prompt = build_prompt(hn,an,hf,af,h2h,hxg,axg,h_htxg,a_htxg,
                               stats,h_s,a_s,h_sc,a_sc,top_ms,top_ht,
                               odds_analysis=oa)
@@ -4563,24 +4185,31 @@ if fetch_btn:
             "odds_analysis":oa,
             "pattern_data":pattern_data,
         }
-    bar.progress(1.0); time.sleep(0.3); bar.empty()
+    bar.progress(1.0)
+    time.sleep(0.3)
+    bar.empty()
     st.success("✅ Veriler hazır! Analiz için maç seç.")
 
 # ══════════════════════════════════════════════════════════════════
 # TOPLU ANALİZ
 # ══════════════════════════════════════════════════════════════════
 if all_btn:
-    if not st.session_state.mdata: st.warning("Önce Maçları Çek!")
+    if not st.session_state.mdata:
+        st.warning("Önce Maçları Çek!")
     else:
-        items=list(st.session_state.mdata.items()); bar2=st.progress(0)
+        items=list(st.session_state.mdata.items())
+        bar2=st.progress(0)
         for i,(mid,d) in enumerate(items):
-            hn=d["match"]["homeTeam"]["name"]; an=d["match"]["awayTeam"]["name"]
+            hn=d["match"]["homeTeam"]["name"]
+            an=d["match"]["awayTeam"]["name"]
             bar2.progress(i/len(items),text=f"({i+1}/{len(items)}) {hn}–{an}")
             result = groq_call(d["prompt"])
             st.session_state.analyses[mid] = result
             if i < len(items) - 1:
-                time.sleep(8)   # Groq rate limit: maçlar arası 8sn bekle
-        bar2.progress(1.0); time.sleep(0.3); bar2.empty()
+                time.sleep(8)
+        bar2.progress(1.0)
+        time.sleep(0.3)
+        bar2.empty()
         st.success("✅ Tümü tamamlandı!")
 
 # ══════════════════════════════════════════════════════════════════
@@ -4589,100 +4218,100 @@ if all_btn:
 if st.session_state.matches:
     st.markdown(f"### ⚽ {len(st.session_state.matches)} Maç · {sel_date.strftime('%d.%m.%Y')}")
     for m in st.session_state.matches:
-        mid=m["id"]; hn=m["homeTeam"]["name"]; an=m["awayTeam"]["name"]
-        utc=m.get("utcDate","")[:16].replace("T"," "); done=mid in st.session_state.analyses
+        mid=m["id"]
+        hn=m["homeTeam"]["name"]
+        an=m["awayTeam"]["name"]
+        utc=m.get("utcDate","")[:16].replace("T"," ")
+        done=mid in st.session_state.analyses
         d=st.session_state.mdata.get(mid,{})
-        # Oran özeti için chip
-        _odds_chip = ""
-        _d_oa = st.session_state.mdata.get(mid,{}).get("odds_analysis")
+        _odds_chip = \"\"
+        _d_oa = st.session_state.mdata.get(mid,{}).get(\"odds_analysis\")
         if _d_oa:
-            _src = _d_oa.get("_source","")
-            _is_real  = "Bet365" in _src or "football-data" in _src or _src == "manuel"
-            _is_est   = "groq" in _src.lower() or "model" in _src.lower()
-            _src_icon = ("🟢" if "Bet365" in _src
-                        else "📊" if "football-data" in _src
-                        else "✏️" if _src == "manuel"
-                        else "⚠️")  # tahmin
+            _src = _d_oa.get(\"_source\",\"\")
+            _is_real  = \"Bet365\" in _src or \"football-data\" in _src or _src == \"manuel\"
+            _is_est   = \"groq\" in _src.lower() or \"model\" in _src.lower()
+            _src_icon = (\"🟢\" if \"Bet365\" in _src
+                        else \"📊\" if \"football-data\" in _src
+                        else \"✏️\" if _src == \"manuel\"
+                        else \"⚠️\")
             _src_label = (_src if _is_real
-                          else "TAHMİN — gerçek oran yok")
-            _chip_color = "#3ecf7a" if "Bet365" in _src else "#f5a623" if _is_est else "#4c9eff"
-            _odds_chip = f' · {_src_icon} <span style="color:{_chip_color}">1:{_d_oa["o1"]} X:{_d_oa["ox"]} 2:{_d_oa["o2"]}</span> <span style="color:#4a6880;font-size:.7em">({_src_label})</span>'
-        with st.expander(f"{'✅' if done else '🔴'}  {hn}  vs  {an}  ·  {utc[11:16]}"):
+                          else \"TAHMİN — gerçek oran yok\")
+            _chip_color = \"#3ecf7a\" if \"Bet365\" in _src else \"#f5a623\" if _is_est else \"#4c9eff\"
+            _odds_chip = f' · {_src_icon} <span style=\"color:{_chip_color}\">1:{_d_oa[\"o1\"]} X:{_d_oa[\"ox\"]} 2:{_d_oa[\"o2\"]}</span> <span style=\"color:#4a6880;font-size:.7em\">({_src_label})</span>'
+        with st.expander(f\"{'✅' if done else '🔴'}  {hn}  vs  {an}  ·  {utc[11:16]}\"):
             if d:
-                hxg = d.get("hxg",0); axg = d.get("axg",0)
-                hf  = d.get("hf",{});  af  = d.get("af",{})
-                h2  = d.get("h2h",{})
-                oa  = d.get("odds_analysis")
-                pd_ = d.get("pattern_data")
+                hxg = d.get(\"hxg\",0)
+                axg = d.get(\"axg\",0)
+                hf  = d.get(\"hf\",{})
+                af  = d.get(\"af\",{})
+                h2  = d.get(\"h2h\",{})
+                oa  = d.get(\"odds_analysis\")
+                pd_ = d.get(\"pattern_data\")
 
-                # ── Özet satırı ──────────────────────────────
                 if oa:
-                    _src      = oa.get("_source","")
-                    _is_est   = "groq" in _src.lower() or "model" in _src.lower()
-                    _src_icon = "🟢 Bet365" if "Bet365" in _src else ("📊 fdco.uk" if "football-data" in _src else ("✏️ Manuel" if _src=="manuel" else "⚠️ TAHMİN"))
-                    _warn_txt = ' <span style="color:#f5a623;font-weight:700">⚠️ Gerçek oran yok — bu oranlar model tahminidir</span>' if _is_est else ''
-                    odds_txt = (f' &nbsp;·&nbsp; <b style="color:#f5a623">1:{oa["o1"]} X:{oa["ox"]} 2:{oa["o2"]}</b>'
-                                f' <span style="color:#4a6880;font-size:.85em">({_src_icon})</span>{_warn_txt}')
+                    _src      = oa.get(\"_source\",\"\")
+                    _is_est   = \"groq\" in _src.lower() or \"model\" in _src.lower()
+                    _src_icon = \"🟢 Bet365\" if \"Bet365\" in _src else (\"📊 fdco.uk\" if \"football-data\" in _src else (\"✏️ Manuel\" if _src==\"manuel\" else \"⚠️ TAHMİN\"))
+                    _warn_txt = ' <span style=\"color:#f5a623;font-weight:700\">⚠️ Gerçek oran yok — bu oranlar model tahminidir</span>' if _is_est else ''
+                    odds_txt = (f' &nbsp;·&nbsp; <b style=\"color:#f5a623\">1:{oa[\"o1\"]} X:{oa[\"ox\"]} 2:{oa[\"o2\"]}</b>'
+                                f' <span style=\"color:#4a6880;font-size:.85em\">({_src_icon})</span>{_warn_txt}')
                 else:
-                    odds_txt = ' &nbsp;·&nbsp; <span style="color:#4a6880">Oran çekilemedi</span>'
+                    odds_txt = ' &nbsp;·&nbsp; <span style=\"color:#4a6880\">Oran çekilemedi</span>'
                 st.markdown(
-                    f'<div style="font-size:.75rem;color:#4a6880;padding:6px 0;border-bottom:1px solid #1c2e44;margin-bottom:8px">'
-                    f'xG: <b style="color:#4c9eff">{hxg}</b>–<b style="color:#ff7070">{axg}</b>'
-                    f' &nbsp;·&nbsp; {hn}: <b style="color:#a8c4d8">{hf.get("form_str","?") if hf else "?"}</b>'
-                    f' &nbsp;·&nbsp; {an}: <b style="color:#a8c4d8">{af.get("form_str","?") if af else "?"}</b>'
-                    f' &nbsp;·&nbsp; H2H: {h2.get("hw",0)}G-{h2.get("dr",0)}B-{h2.get("aw",0)}M'
+                    f'<div style=\"font-size:.75rem;color:#4a6880;padding:6px 0;border-bottom:1px solid #1c2e44;margin-bottom:8px\">'
+                    f'xG: <b style=\"color:#4c9eff\">{hxg}</b>–<b style=\"color:#ff7070\">{axg}</b>'
+                    f' &nbsp;·&nbsp; {hn}: <b style=\"color:#a8c4d8\">{hf.get(\"form_str\",\"?\") if hf else \"?\"}</b>'
+                    f' &nbsp;·&nbsp; {an}: <b style=\"color:#a8c4d8\">{af.get(\"form_str\",\"?\") if af else \"?\"}</b>'
+                    f' &nbsp;·&nbsp; H2H: {h2.get(\"hw\",0)}G-{h2.get(\"dr\",0)}B-{h2.get(\"aw\",0)}M'
                     f'{odds_txt}</div>', unsafe_allow_html=True)
 
-                # ── Oran Paneli — analiz beklenmez ───────────
                 if oa:
-                    render_odds_panel(oa, hn, an, d.get("stats",{}))
+                    render_odds_panel(oa, hn, an, d.get(\"stats\",{}))
 
-                # ── Pattern Paneli — analiz beklenmez ────────
                 if pd_ and oa:
-                    render_pattern_panel(pd_, oa.get("o1",0), oa.get("ox",0), oa.get("o2",0), hn, an,
-                                         odds_source=oa.get("_source","football-data.co.uk"))
+                    render_pattern_panel(pd_, oa.get(\"o1\",0), oa.get(\"ox\",0), oa.get(\"o2\",0), hn, an,
+                                         odds_source=oa.get(\"_source\",\"football-data.co.uk\"))
                 elif not oa:
-                    st.info("💡 Oran verisi bulunamadı. Lig fixtures.csv'de bu maç yoksa sonraki hafta güncellenir.")
+                    st.info(\"💡 Oran verisi bulunamadı. Lig fixtures.csv'de bu maç yoksa sonraki hafta güncellenir.\")
 
-                # ── Analiz butonu veya tam VS UI ─────────────
                 if not done:
-                    if st.button("🤖 Analiz Et", key=f"btn_{mid}", type="primary"):
-                        with st.spinner(f"🦙 Groq: {hn}–{an}..."):
-                            st.session_state.analyses[mid] = groq_call(d["prompt"])
+                    if st.button(\"🤖 Analiz Et\", key=f\"btn_{mid}\", type=\"primary\"):
+                        with st.spinner(f\"🦙 Groq: {hn}–{an}...\"):
+                            st.session_state.analyses[mid] = groq_call(d[\"prompt\"])
                         st.rerun()
                 else:
                     try:
                         render_vs_ui(
-                            d["match"],d["hf"],d["af"],d["h2h"],
-                            d["hxg"],d["axg"],d["h_htxg"],d["a_htxg"],
-                            d["stats"],d["top_ms"],d["top_ht"],
-                            d["h_stand"],d["a_stand"],d["h_sc"],d["a_sc"],
+                            d[\"match\"],d[\"hf\"],d[\"af\"],d[\"h2h\"],
+                            d[\"hxg\"],d[\"axg\"],d[\"h_htxg\"],d[\"a_htxg\"],
+                            d[\"stats\"],d[\"top_ms\"],d[\"top_ht\"],
+                            d[\"h_stand\"],d[\"a_stand\"],d[\"h_sc\"],d[\"a_sc\"],
                             st.session_state.analyses[mid],
                             odds_analysis=oa,
                         )
                     except Exception as _e:
-                        st.error(f"UI render hatası: {_e}")
+                        st.error(f\"UI render hatası: {_e}\")
                         st.markdown(
-                            f'<div style="background:#060d1c;border:1px solid #1a2e4a;border-radius:10px;'
+                            f'<div style=\"background:#060d1c;border:1px solid #1a2e4a;border-radius:10px;'
                             f'padding:1.2rem;font-size:.83rem;color:#c0cfe0;white-space:pre-wrap;'
-                            f'max-height:600px;overflow-y:auto;font-family:monospace">'
+                            f'max-height:600px;overflow-y:auto;font-family:monospace\">'
                             f'{st.session_state.analyses[mid]}</div>',
                             unsafe_allow_html=True
                         )
 else:
-    st.markdown("""
-<div style="background:#0a1628;border:1px solid #0f2a45;border-radius:14px;padding:1.5rem 1.8rem">
-  <div style="font-size:.7rem;color:#1a3050;font-weight:700;letter-spacing:.12em;
-  text-transform:uppercase;margin-bottom:10px">🚀 BAŞLAMAK İÇİN</div>
-  <div style="font-size:.85rem;color:#3a5570;line-height:2.2">
-    1. Sol sidebar'dan <b style="color:#c0cfe0">Kategori</b> → <b style="color:#c0cfe0">Lig</b> seç<br>
-    2. <b style="color:#c0cfe0">Tarih</b> seç (maçların olduğu bir gün)<br>
-    3. <b style="color:#00e5a0">🔍 Maçları Çek</b> butonuna bas<br>
-    4. Maçı aç → <b style="color:#00e5a0">🤖 Analiz Et</b><br>
+    st.markdown(\"\"\"
+<div style=\"background:#0a1628;border:1px solid #0f2a45;border-radius:14px;padding:1.5rem 1.8rem\">
+  <div style=\"font-size:.7rem;color:#1a3050;font-weight:700;letter-spacing:.12em;
+  text-transform:uppercase;margin-bottom:10px\">🚀 BAŞLAMAK İÇİN</div>
+  <div style=\"font-size:.85rem;color:#3a5570;line-height:2.2\">
+    1. Sol sidebar'dan <b style=\"color:#c0cfe0\">Kategori</b> → <b style=\"color:#c0cfe0\">Lig</b> seç<br>
+    2. <b style=\"color:#c0cfe0\">Tarih</b> seç (maçların olduğu bir gün)<br>
+    3. <b style=\"color:#00e5a0\">🔍 Maçları Çek</b> butonuna bas<br>
+    4. Maçı aç → <b style=\"color:#00e5a0\">🤖 Analiz Et</b><br>
     5. Profesyonel VS karşılaştırma arayüzü açılır
   </div>
-  <div style="font-size:.68rem;color:#1a3050;margin-top:14px">
+  <div style=\"font-size:.68rem;color:#1a3050;margin-top:14px\">
     ✅ API key'ler hazır · football-data.org + Groq Llama 3.3 70B
   </div>
 </div>
-""", unsafe_allow_html=True)
+\"\"\", unsafe_allow_html=True)
